@@ -15,6 +15,11 @@ def download_video(video_id):
         'merge_output_format': 'mp4',
         'quiet': True,
         'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'mweb', 'tv']
+            }
+        },
         'postprocessors': [{
             'key': 'FFmpegVideoConvertor',
             'preferedformat': 'mp4',
