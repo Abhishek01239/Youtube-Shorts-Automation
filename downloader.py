@@ -5,8 +5,8 @@ from config import RAW_VIDEOS_DIR, BASE_DIR, get_ffmpeg_path
 
 def download_video(video_id):
     """
-    Downloads a public video using unauthenticated Android VR/Android client APIs 
-    first (bypassing cookie session invalidation), falling back to iOS and cookies.
+    Downloads a public video using multi-stage client fallback endpoints 
+    with full cookie session authentication and mobile APIs.
     """
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
@@ -43,13 +43,15 @@ def download_video(video_id):
 
     has_cookies = os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 10
 
-    # Multi-Stage Download Strategy:
-    # Stage 1 & 2 run unauthenticated via Android VR/iOS APIs (which bypass bot checks without triggering cookie session errors)
-    # Stage 3 uses cookies.txt as last resort
+    if has_cookies:
+        print(f"[+] Loaded cookies file: {cookies_path} ({os.path.getsize(cookies_path)} bytes)")
+    else:
+        print("[-] No valid cookies file detected. Running unauthenticated fallback.")
+
     stages = [
-        ("Android VR API", ['android_vr', 'android'], False),
-        ("iOS & Mobile Web API", ['ios', 'mweb'], False),
-        ("Authenticated Cookie Session", ['android', 'web'], True)
+        ("Android VR & Mobile API", ['android_vr', 'android'], True),
+        ("iOS & Mobile Web API", ['ios', 'mweb'], True),
+        ("Standard Client", ['web', 'mweb'], True)
     ]
 
     for stage_name, clients, use_cookies in stages:
@@ -57,7 +59,6 @@ def download_video(video_id):
         opts = dict(ydl_opts_base)
         if use_cookies and has_cookies:
             opts['cookiefile'] = cookies_path
-            print(f"[+] Attaching cookiefile for {stage_name}: {cookies_path}")
             
         opts['extractor_args'] = {'youtube': {'player_client': clients}}
         
