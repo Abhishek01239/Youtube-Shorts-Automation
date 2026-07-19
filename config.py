@@ -32,15 +32,14 @@ CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, "client_secret.json")
 # Limits & Requirements
 MAX_UPLOADS_PER_DAY = 15
 
-# Target Twitch Game Categories
+# Target Gaming Categories (Strictly COD, Indian Bike Driving 3D, GTA 5, GTA 6, and VALORANT)
 TARGET_GAMES = [
     "Grand Theft Auto V",
-    "Fortnite",
-    "Minecraft",
-    "Apex Legends",
+    "Grand Theft Auto VI",
     "VALORANT",
     "Call of Duty: Warzone",
-    "Counter-Strike"
+    "Call of Duty: Modern Warfare III",
+    "Indian Bike Driving 3D"
 ]
 
 def setup_secret_files():
