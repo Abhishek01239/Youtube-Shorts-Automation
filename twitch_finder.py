@@ -11,19 +11,23 @@ _TWITCH_TOKEN = None
 def get_twitch_access_token():
     """
     Obtains an App Access Token using Twitch Client ID and Client Secret.
+    Automatically strips accidental trailing newlines or whitespace.
     """
     global _TWITCH_TOKEN
     if _TWITCH_TOKEN:
         return _TWITCH_TOKEN
 
-    if not TWITCH_CLIENT_ID or not TWITCH_CLIENT_SECRET:
+    client_id = (TWITCH_CLIENT_ID or "").strip()
+    client_secret = (TWITCH_CLIENT_SECRET or "").strip()
+
+    if not client_id or not client_secret:
         logging.error("TWITCH_CLIENT_ID or TWITCH_CLIENT_SECRET environment variable is missing!")
         raise ValueError("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET must be set in environment variables.")
 
     url = "https://id.twitch.tv/oauth2/token"
     params = {
-        "client_id": TWITCH_CLIENT_ID,
-        "client_secret": TWITCH_CLIENT_SECRET,
+        "client_id": client_id,
+        "client_secret": client_secret,
         "grant_type": "client_credentials"
     }
 
@@ -73,8 +77,9 @@ def find_twitch_clips():
         logging.error("Failed to authenticate with Twitch API.")
         return []
 
+    client_id = (TWITCH_CLIENT_ID or "").strip()
     headers = {
-        "Client-ID": TWITCH_CLIENT_ID,
+        "Client-ID": client_id,
         "Authorization": f"Bearer {token}"
     }
 

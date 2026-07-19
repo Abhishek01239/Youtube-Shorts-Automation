@@ -5,11 +5,11 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# API Keys & Auth Secrets
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID")
-TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
+# API Keys & Auth Secrets (strip accidental newlines/whitespace)
+YOUTUBE_API_KEY = (os.getenv("YOUTUBE_API_KEY") or "").strip()
+GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or "").strip()
+TWITCH_CLIENT_ID = (os.getenv("TWITCH_CLIENT_ID") or "").strip()
+TWITCH_CLIENT_SECRET = (os.getenv("TWITCH_CLIENT_SECRET") or "").strip()
 
 # Directory Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
