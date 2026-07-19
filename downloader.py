@@ -3,23 +3,18 @@ import yt_dlp
 from config import RAW_VIDEOS_DIR, get_ffmpeg_path
 
 def download_video(video_id):
-    """Downloads a public video using Android API client to eliminate bot checks."""
+    """Downloads a public video using robust multi-stage fallbacks and cookies if present."""
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
         
     out_tmpl = os.path.join(RAW_VIDEOS_DIR, f"{video_id}.%(ext)s")
     
-    ydl_opts = {
+    ydl_opts_base = {
         'format': 'bestvideo[height<=1080]+bestaudio/best',
         'outtmpl': out_tmpl,
         'merge_output_format': 'mp4',
         'postprocessor_args': {
             'ffmpeg': ['-strict', 'experimental', '-c:v', 'copy', '-c:a', 'aac']
-        },
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'ios']
-            }
         },
         'quiet': True,
         'no_warnings': True,
@@ -32,11 +27,20 @@ def download_video(video_id):
     
     local_ffmpeg_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg', 'bin')
     if os.path.exists(local_ffmpeg_dir):
-        ydl_opts['ffmpeg_location'] = local_ffmpeg_dir
+        ydl_opts_base['ffmpeg_location'] = local_ffmpeg_dir
         
-    print(f"[*] Downloading {video_id}...")
+    cookies_path = 'cookies.txt'
+    has_cookies = os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 10
+
+    # Attempt 1: With cookies (if available) + iOS/Android clients
+    opts1 = dict(ydl_opts_base)
+    if has_cookies:
+        opts1['cookiefile'] = cookies_path
+    opts1['extractor_args'] = {'youtube': {'player_client': ['ios', 'android']}}
+    
+    print(f"[*] Downloading {video_id} (Attempt 1)...")
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(opts1) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
             base_filename = ydl.prepare_filename(info)
             final_filename = base_filename.rsplit('.', 1)[0] + '.mp4'
@@ -44,7 +48,23 @@ def download_video(video_id):
                 return final_filename
             elif os.path.exists(base_filename):
                 return base_filename
-            return None
     except Exception as e:
-        print(f"[!] Error downloading {video_id}: {e}")
-        return None
+        print(f"[!] Attempt 1 failed for {video_id}: {e}")
+
+    # Attempt 2: Mobile Web & Android fallback without cookiefile
+    opts2 = dict(ydl_opts_base)
+    opts2['extractor_args'] = {'youtube': {'player_client': ['mweb', 'android']}}
+    print(f"[*] Downloading {video_id} (Attempt 2 fallback)...")
+    try:
+        with yt_dlp.YoutubeDL(opts2) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
+            base_filename = ydl.prepare_filename(info)
+            final_filename = base_filename.rsplit('.', 1)[0] + '.mp4'
+            if os.path.exists(final_filename):
+                return final_filename
+            elif os.path.exists(base_filename):
+                return base_filename
+    except Exception as e:
+        print(f"[!] Attempt 2 failed for {video_id}: {e}")
+
+    return None
