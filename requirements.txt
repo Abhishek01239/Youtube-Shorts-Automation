@@ -1,4 +1,6 @@
 yt-dlp
+bgutil-ytdlp-pot-provider
+yt-dlp-ejs
 google-api-python-client
 google-auth
 google-auth-oauthlib
