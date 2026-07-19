@@ -38,6 +38,17 @@ jobs:
           python -m pip install --upgrade pip yt-dlp
           pip install -r requirements.txt
 
+      - name: Create cookies file from secret
+        run: |
+          if [ -n "${{ secrets.COOKIES_TXT }}" ]; then
+            echo "${{ secrets.COOKIES_TXT }}" > "$GITHUB_WORKSPACE/cookies.txt"
+            chmod 600 "$GITHUB_WORKSPACE/cookies.txt"
+            echo "Successfully wrote cookies to $GITHUB_WORKSPACE/cookies.txt"
+          else
+            echo "No COOKIES_TXT secret provided"
+          fi
+        shell: bash
+
       - name: Execute Shorts Automation (Single Upload)
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
@@ -45,8 +56,16 @@ jobs:
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
           YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
           COOKIES_TXT: ${{ secrets.COOKIES_TXT }}
+          COOKIES_PATH: ${{ github.workspace }}/cookies.txt
         run: |
           python pipeline.py
+
+      - name: Sync branch before commit
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "github-actions[bot]"
+          git fetch origin main
+          git pull --rebase origin main || true
 
       - name: Commit & Push Updated History
         uses: stefanzweifel/git-auto-commit-action@v5

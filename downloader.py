@@ -32,7 +32,7 @@ def download_video(video_id):
     if os.path.exists(local_ffmpeg_dir):
         ydl_opts_base['ffmpeg_location'] = local_ffmpeg_dir
         
-    cookies_path = 'cookies.txt'
+    cookies_path = os.getenv("COOKIES_PATH", "cookies.txt")
     has_cookies = os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 10
 
     client_stages = [
