@@ -1,0 +1,30 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Credentials & environment variables (Do NOT commit sensitive tokens!)
+.env
+token.json
+client_secret.json
+cookies.txt
+oauth_state.json
+
+# Temporary media files
+data/raw_videos/*
+!data/raw_videos/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/clips/*
+data/thumbnails/*
+ffmpeg/
+ffmpeg-*/
+*.tar.xz
+*.mp4
+*.wav
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

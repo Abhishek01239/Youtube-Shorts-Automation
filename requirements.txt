@@ -1,0 +1,17 @@
+yt-dlp
+google-api-python-client
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+groq
+scenedetect[opencv]
+ffmpeg-python
+pydub
+librosa
+SpeechRecognition
+Pillow
+numpy
+scipy
+requests
+aiohttp
+python-dotenv
