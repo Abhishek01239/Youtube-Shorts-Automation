@@ -56,17 +56,24 @@ def log_upload(video_id):
 def upload_short(video_path, metadata, schedule_time=None):
     """
     Uploads a short to YouTube via OAuth2.
-    schedule_time: datetime object in UTC for scheduling.
+    Ensures #shorts tag is present in title to auto-categorize video as a YouTube Short.
     """
-    print(f"[*] Uploading {video_path} to YouTube...")
+    print(f"[*] Uploading {video_path} to YouTube Shorts...")
     youtube = get_authenticated_service()
 
     tags = [t.strip() for t in metadata['tags'].split(',')] if isinstance(metadata['tags'], str) else metadata['tags']
     description = metadata['description'] + "\n\n" + " ".join(metadata['hashtags'])
+    if "#shorts" not in description.lower():
+        description += " #shorts"
+
+    # Ensure #shorts tag is explicitly in title for Shorts classification
+    title = metadata['title']
+    if "#shorts" not in title.lower():
+        title = f"{title[:75]} #shorts"
 
     body = {
         'snippet': {
-            'title': metadata['title'],
+            'title': title,
             'description': description,
             'tags': tags,
             'categoryId': '20' # Gaming

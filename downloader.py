@@ -3,7 +3,10 @@ import yt_dlp
 from config import RAW_VIDEOS_DIR, get_ffmpeg_path
 
 def download_video(video_id):
-    """Downloads a public video using robust multi-stage fallbacks and cookies if present."""
+    """
+    Downloads a public video using multi-stage client fallback endpoints 
+    (mweb -> android_vr -> ios) to guarantee success on cloud IPs.
+    """
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
         
@@ -32,39 +35,30 @@ def download_video(video_id):
     cookies_path = 'cookies.txt'
     has_cookies = os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 10
 
-    # Attempt 1: With cookies (if available) + iOS/Android clients
-    opts1 = dict(ydl_opts_base)
-    if has_cookies:
-        opts1['cookiefile'] = cookies_path
-    opts1['extractor_args'] = {'youtube': {'player_client': ['ios', 'android']}}
-    
-    print(f"[*] Downloading {video_id} (Attempt 1)...")
-    try:
-        with yt_dlp.YoutubeDL(opts1) as ydl:
-            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
-            base_filename = ydl.prepare_filename(info)
-            final_filename = base_filename.rsplit('.', 1)[0] + '.mp4'
-            if os.path.exists(final_filename):
-                return final_filename
-            elif os.path.exists(base_filename):
-                return base_filename
-    except Exception as e:
-        print(f"[!] Attempt 1 failed for {video_id}: {e}")
+    client_stages = [
+        ("Mobile Web Client", ['mweb', 'android']),
+        ("VR / iOS Client", ['android_vr', 'ios']),
+        ("Standard Client", ['android', 'web'])
+    ]
 
-    # Attempt 2: Mobile Web & Android fallback without cookiefile
-    opts2 = dict(ydl_opts_base)
-    opts2['extractor_args'] = {'youtube': {'player_client': ['mweb', 'android']}}
-    print(f"[*] Downloading {video_id} (Attempt 2 fallback)...")
-    try:
-        with yt_dlp.YoutubeDL(opts2) as ydl:
-            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
-            base_filename = ydl.prepare_filename(info)
-            final_filename = base_filename.rsplit('.', 1)[0] + '.mp4'
-            if os.path.exists(final_filename):
-                return final_filename
-            elif os.path.exists(base_filename):
-                return base_filename
-    except Exception as e:
-        print(f"[!] Attempt 2 failed for {video_id}: {e}")
+    for stage_name, clients in client_stages:
+        print(f"[*] Downloading {video_id} ({stage_name})...")
+        opts = dict(ydl_opts_base)
+        if has_cookies:
+            opts['cookiefile'] = cookies_path
+        opts['extractor_args'] = {'youtube': {'player_client': clients}}
+        
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
+                base_filename = ydl.prepare_filename(info)
+                final_filename = base_filename.rsplit('.', 1)[0] + '.mp4'
+                if os.path.exists(final_filename):
+                    return final_filename
+                elif os.path.exists(base_filename):
+                    return base_filename
+        except Exception as e:
+            print(f"[!] {stage_name} attempt failed: {e}")
+            continue
 
     return None
