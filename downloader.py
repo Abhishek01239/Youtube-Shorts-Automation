@@ -1,11 +1,12 @@
 import os
+import time
 import yt_dlp
 from config import RAW_VIDEOS_DIR, BASE_DIR, get_ffmpeg_path
 
 def download_video(video_id):
     """
     Downloads a public video using multi-stage client fallback endpoints 
-    with cookie authentication logging.
+    with cookie authentication logging & rate limit protections.
     """
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
@@ -26,6 +27,8 @@ def download_video(video_id):
         'fragment_retries': 10,
         'file_access_retries': 5,
         'concurrent_fragment_downloads': 4,
+        'sleep_interval': 3,
+        'max_sleep_interval': 5,
     }
     
     local_ffmpeg_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg', 'bin')
@@ -69,6 +72,7 @@ def download_video(video_id):
                     return base_filename
         except Exception as e:
             print(f"[!] {stage_name} attempt failed: {e}")
+            time.sleep(2) # Pause between client stage retries
             continue
 
     return None

@@ -53,6 +53,7 @@ def run_single_trigger():
     uploaded = False
     for video in videos:
         print(f"\n>>> Processing Candidate: {video['title']} (ID: {video['video_id']})")
+        time.sleep(3) # Human-like throttle delay to prevent IP rate-limiting
         
         # 1. Download
         video_path = download_video(video['video_id'])
