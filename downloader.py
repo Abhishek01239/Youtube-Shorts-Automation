@@ -14,7 +14,7 @@ def download_video(video_id):
         'outtmpl': out_tmpl,
         'merge_output_format': 'mp4',
         'postprocessor_args': {
-            'ffmpeg': ['-c:v', 'copy', '-c:a', 'aac']
+            'ffmpeg': ['-strict', 'experimental', '-c:v', 'copy', '-c:a', 'aac']
         },
         'quiet': True,
         'no_warnings': True,
