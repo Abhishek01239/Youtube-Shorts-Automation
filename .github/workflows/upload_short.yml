@@ -33,10 +33,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Install Dependencies
+      - name: Install Latest Dependencies & yt-dlp
         run: |
           python -m pip install --upgrade pip yt-dlp
           pip install -r requirements.txt
+          python -m pip install -U yt-dlp
+          yt-dlp --version
 
       - name: Create cookies file from secret
         run: |
@@ -48,6 +50,21 @@ jobs:
             echo "No COOKIES_TXT secret provided"
           fi
         shell: bash
+
+      - name: Verify Cookies File Header
+        run: |
+          if [ -f "$GITHUB_WORKSPACE/cookies.txt" ]; then
+            ls -lh "$GITHUB_WORKSPACE/cookies.txt"
+            head -n 5 "$GITHUB_WORKSPACE/cookies.txt"
+          else
+            echo "cookies.txt file does not exist on runner"
+          fi
+
+      - name: Direct CLI yt-dlp Diagnostic Test
+        run: |
+          if [ -f "$GITHUB_WORKSPACE/cookies.txt" ]; then
+            yt-dlp -v --cookies "$GITHUB_WORKSPACE/cookies.txt" --extractor-args "youtube:player_client=android_vr,android" "https://www.youtube.com/watch?v=N2uIZ61-G-4" || true
+          fi
 
       - name: Execute Shorts Automation (Single Upload)
         env:

@@ -6,7 +6,7 @@ from config import RAW_VIDEOS_DIR, BASE_DIR, get_ffmpeg_path
 def download_video(video_id):
     """
     Downloads a public video using multi-stage client fallback endpoints 
-    with full cookie session authentication and mobile APIs.
+    with cookie authentication logging & verbose diagnostics.
     """
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
@@ -20,8 +20,9 @@ def download_video(video_id):
         'postprocessor_args': {
             'ffmpeg': ['-strict', 'experimental', '-c:v', 'copy', '-c:a', 'aac']
         },
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,
+        'no_warnings': False,
+        'verbose': True,
         'socket_timeout': 30,
         'retries': 10,
         'fragment_retries': 10,
@@ -43,10 +44,12 @@ def download_video(video_id):
 
     has_cookies = os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 10
 
-    if has_cookies:
-        print(f"[+] Loaded cookies file: {cookies_path} ({os.path.getsize(cookies_path)} bytes)")
-    else:
-        print("[-] No valid cookies file detected. Running unauthenticated fallback.")
+    print("=== COOKIES DIAGNOSTIC INFO ===")
+    print("Cookie file:", cookies_path)
+    print("Exists:", os.path.exists(cookies_path))
+    if os.path.exists(cookies_path):
+        print("Size (bytes):", os.path.getsize(cookies_path))
+    print("===============================")
 
     stages = [
         ("Android VR & Mobile API", ['android_vr', 'android'], True),
@@ -55,7 +58,7 @@ def download_video(video_id):
     ]
 
     for stage_name, clients, use_cookies in stages:
-        print(f"[*] Downloading {video_id} ({stage_name})...")
+        print(f"\n[*] Downloading {video_id} ({stage_name})...")
         opts = dict(ydl_opts_base)
         if use_cookies and has_cookies:
             opts['cookiefile'] = cookies_path
