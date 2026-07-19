@@ -3,14 +3,14 @@ import yt_dlp
 from config import RAW_VIDEOS_DIR, get_ffmpeg_path
 
 def download_video(video_id):
-    """Downloads a public video in best quality up to 1080p with AAC audio stream conversion & retry logic."""
+    """Downloads a public video in best quality up to 1080p using AVC1/VP9 codecs to avoid raw AV1 (.f399) errors."""
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
         
     out_tmpl = os.path.join(RAW_VIDEOS_DIR, f"{video_id}.%(ext)s")
     
     ydl_opts = {
-        'format': 'bestvideo[height<=1080][vcodec!=none]+bestaudio[acodec!=none]/bestvideo[height<=1080]+bestaudio/best[ext=mp4]/best',
+        'format': 'bestvideo[vcodec^=avc1][height<=1080]+bestaudio[acodec^=mp4a]/bestvideo[vcodec^=vp9][height<=1080]+bestaudio/best[ext=mp4]/best',
         'outtmpl': out_tmpl,
         'merge_output_format': 'mp4',
         'postprocessor_args': {
