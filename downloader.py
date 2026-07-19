@@ -3,22 +3,18 @@ import yt_dlp
 from config import RAW_VIDEOS_DIR, get_ffmpeg_path
 
 def download_video(video_id):
-    """Downloads a video in best quality up to 4K with automatic fallback."""
+    """Downloads a video in best quality up to 1080p/4K with automatic fallback."""
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
         
     out_tmpl = os.path.join(RAW_VIDEOS_DIR, f"{video_id}.%(ext)s")
     
     ydl_opts_base = {
-        'format': 'bestvideo[height<=2160]+bestaudio/best',
+        'format': 'bestvideo[vcodec^=avc1][height<=1080]+bestaudio[acodec^=mp4a]/bestvideo[height<=1080]+bestaudio/best[ext=mp4]/best',
         'outtmpl': out_tmpl,
         'merge_output_format': 'mp4',
         'quiet': True,
         'no_warnings': True,
-        'postprocessors': [{
-            'key': 'FFmpegVideoConvertor',
-            'preferedformat': 'mp4',
-        }],
     }
     
     local_ffmpeg_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg', 'bin')
