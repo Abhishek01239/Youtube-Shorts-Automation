@@ -3,14 +3,14 @@ import yt_dlp
 from config import RAW_VIDEOS_DIR, get_ffmpeg_path
 
 def download_video(video_id):
-    """Downloads a public video in best quality up to 1080p using TV/Mobile clients and webpage skip to bypass bot checks."""
+    """Downloads a public video using Android API client to eliminate bot checks."""
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
         
     out_tmpl = os.path.join(RAW_VIDEOS_DIR, f"{video_id}.%(ext)s")
     
     ydl_opts = {
-        'format': 'bestvideo[vcodec^=avc1][height<=1080]+bestaudio[acodec^=mp4a]/bestvideo[vcodec^=vp9][height<=1080]+bestaudio/best[ext=mp4]/best',
+        'format': 'bestvideo[height<=1080]+bestaudio/best',
         'outtmpl': out_tmpl,
         'merge_output_format': 'mp4',
         'postprocessor_args': {
@@ -18,8 +18,7 @@ def download_video(video_id):
         },
         'extractor_args': {
             'youtube': {
-                'player_client': ['tv', 'android', 'ios'],
-                'player_skip': ['webpage', 'configs']
+                'player_client': ['android', 'ios']
             }
         },
         'quiet': True,
