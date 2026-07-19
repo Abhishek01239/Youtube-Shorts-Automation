@@ -3,7 +3,7 @@ import yt_dlp
 from config import RAW_VIDEOS_DIR, get_ffmpeg_path
 
 def download_video(video_id):
-    """Downloads a video with extractor player_client fallbacks to bypass YouTube bot detection."""
+    """Downloads a public video in best quality up to 1080p/4K with player client fallbacks."""
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
         
@@ -17,7 +17,7 @@ def download_video(video_id):
         'no_warnings': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios', 'mweb']
+                'player_client': ['tv', 'web_embedded', 'android', 'ios']
             }
         }
     }
@@ -26,8 +26,7 @@ def download_video(video_id):
     if os.path.exists(local_ffmpeg_dir):
         ydl_opts_base['ffmpeg_location'] = local_ffmpeg_dir
         
-    # Attempt 1: Mobile player_client API without cookies (bypasses bot check on cloud IP)
-    print(f"[*] Downloading {video_id} (Attempt 1: mobile player clients)...")
+    print(f"[*] Downloading {video_id}...")
     try:
         with yt_dlp.YoutubeDL(ydl_opts_base) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
@@ -38,14 +37,15 @@ def download_video(video_id):
             elif os.path.exists(base_filename):
                 return base_filename
     except Exception as e:
-        print(f"[!] Mobile client attempt failed: {e}. Trying cookies...")
+        print(f"[!] Primary download failed for {video_id}: {e}")
 
-    # Attempt 2: Try with cookies if cookies.txt exists
+    # Fallback attempt with cookies if cookies.txt is provided
     cookies_path = 'cookies.txt'
     if os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 10:
         opts_with_cookies = dict(ydl_opts_base)
         opts_with_cookies['cookiefile'] = cookies_path
-        print(f"[*] Downloading {video_id} (Attempt 2: with cookies)...")
+        opts_with_cookies.pop('extractor_args', None)
+        print(f"[*] Retrying {video_id} with cookies...")
         try:
             with yt_dlp.YoutubeDL(opts_with_cookies) as ydl:
                 info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
@@ -56,6 +56,6 @@ def download_video(video_id):
                 elif os.path.exists(base_filename):
                     return base_filename
         except Exception as e:
-            print(f"[!] Cookie attempt failed: {e}")
+            print(f"[!] Cookie download failed for {video_id}: {e}")
 
     return None
