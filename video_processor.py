@@ -18,15 +18,18 @@ def get_font_path():
 def process_video(video_path, start, end, output_filename, mute_original=False):
     """
     Processes a landscape gameplay video into a high-quality YouTube Short.
-    Optimized for fast rendering runtime & pristine quality.
+    Guarantees strict duration <= 45s for YouTube Shorts compliance.
     """
     if not os.path.exists(PROCESSED_DIR):
         os.makedirs(PROCESSED_DIR, exist_ok=True)
         
     out_path = os.path.join(PROCESSED_DIR, output_filename)
-    print(f"[*] Processing highlight ({start:.1f}s -> {end:.1f}s)")
     
-    stream = ffmpeg.input(video_path, ss=start, t=end-start)
+    # Cap raw clip duration to 45s max (speedup 1.2x produces ~37s Short)
+    clip_duration = min(max(end - start, 15.0), 45.0)
+    print(f"[*] Processing Short clip ({start:.1f}s -> {start+clip_duration:.1f}s, target duration: {clip_duration/1.2:.1f}s)")
+    
+    stream = ffmpeg.input(video_path, ss=start, t=clip_duration)
     video = stream.video
     audio = stream.audio
     
@@ -36,7 +39,7 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
     # 2. Crop center to 9:16 (1080x1920)
     v = v.filter("crop", w=1080, h=1920, x="(in_w-1080)/2", y=0)
     
-    # 3. Speed up to 1.2x
+    # 3. Speed up video to 1.2x
     v = v.filter("setpts", "0.833333*PTS")
     
     # 4. Light denoise
@@ -55,13 +58,14 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
     kwargs = {
         "vcodec": "libx264",
         "acodec": "aac",
-        "preset": "fast",       # 3x-5x faster than 'slow' with negligible quality diff
-        "crf": 20,              # High visual quality for 1080p Shorts
+        "preset": "fast",
+        "crf": 20,
         "pix_fmt": "yuv420p",
         "movflags": "+faststart",
         "strict": "experimental",
         "loglevel": "error",
-        "threads": 0            # Use all available CPU cores
+        "threads": 0,
+        "shortest": None  # Crucial: cut output at shortest stream (video length)
     }
     
     bgm_path = get_random_bgm()
@@ -71,9 +75,9 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
                 ffmpeg
                 .input(bgm_path)
                 .audio
+                .filter("atrim", duration=clip_duration)
                 .filter("volume", 0.8)
             )
-            kwargs["shortest"] = None
             out = ffmpeg.output(v, bgm, out_path, **kwargs)
         else:
             out = ffmpeg.output(v, out_path, an=None, **kwargs)
@@ -84,6 +88,7 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
                 ffmpeg
                 .input(bgm_path)
                 .audio
+                .filter("atrim", duration=clip_duration)
                 .filter("volume", 0.15)
             )
             audio = ffmpeg.filter([audio, bgm], "amix", inputs=2, duration="first")
@@ -93,7 +98,7 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
     try:
         ffmpeg_cmd = get_ffmpeg_path()
         out.run(overwrite_output=True, cmd=ffmpeg_cmd)
-        print(f"[+] Video saved: {out_path}")
+        print(f"[+] YouTube Short saved: {out_path}")
         return out_path
     except ffmpeg.Error as e:
         print("\n========== FFMPEG ERROR ==========")
