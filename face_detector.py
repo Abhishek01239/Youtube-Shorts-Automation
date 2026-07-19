@@ -5,9 +5,28 @@ from collections import Counter
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-# Load pre-trained OpenCV face detector
-CASCADE_PATH = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-face_cascade = cv2.CascadeClassifier(CASCADE_PATH)
+_FACE_CASCADE = None
+
+def get_face_cascade():
+    """Safely initializes the OpenCV Haar Face Cascade classifier."""
+    global _FACE_CASCADE
+    if _FACE_CASCADE is not None:
+        return _FACE_CASCADE
+
+    try:
+        cascade_dir = getattr(cv2, "data", None)
+        if cascade_dir and hasattr(cascade_dir, "haarcascades"):
+            path = os.path.join(cascade_dir.haarcascades, 'haarcascade_frontalface_default.xml')
+            if os.path.exists(path):
+                _FACE_CASCADE = cv2.CascadeClassifier(path)
+                return _FACE_CASCADE
+        
+        # Fallback constructor
+        _FACE_CASCADE = cv2.CascadeClassifier()
+        return _FACE_CASCADE
+    except Exception as e:
+        logging.warning(f"[!] Warning initializing face cascade: {e}")
+        return None
 
 def detect_facecam(video_path, sample_rate_sec=1):
     """
@@ -25,6 +44,11 @@ def detect_facecam(video_path, sample_rate_sec=1):
     if not os.path.exists(video_path):
         logging.error(f"[!] Video file not found for face detection: {video_path}")
         return {"should_skip": True, "skip_reason": "Video file not found", "corner": None}
+
+    cascade = get_face_cascade()
+    if not cascade or cascade.empty():
+        logging.warning("[!] Face detector cascade unavailable. Skipping face detection.")
+        return {"should_skip": False, "skip_reason": None, "corner": None, "max_face_percentage": 0.0}
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -59,7 +83,7 @@ def detect_facecam(video_path, sample_rate_sec=1):
         if frame_count % frame_interval == 0:
             sampled_frames += 1
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(
+            faces = cascade.detectMultiScale(
                 gray, 
                 scaleFactor=1.1, 
                 minNeighbors=5, 
