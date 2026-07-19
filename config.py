@@ -31,19 +31,16 @@ CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, "client_secret.json")
 MAX_SUBS = 500000
 MAX_UPLOADS_PER_DAY = 15
 
-# Expanded Target Gaming Niches
+# Target Gaming Niches (Strictly GTA 5, GTA 6, and Indian Bike Driving 3D)
 TARGET_NICHES = [
     "GTA 5 gameplay no commentary",
+    "GTA 5 stunts gameplay",
+    "GTA 5 funny gameplay",
     "GTA 6 leaks gameplay no commentary",
+    "GTA 6 concept gameplay",
     "Indian Bike Driving 3D gameplay",
-    "Minecraft survival gameplay no commentary",
-    "Minecraft parkour gameplay",
-    "Roblox gameplay no commentary",
-    "Fortnite gameplay no commentary",
-    "BeamNG drive car crash gameplay",
-    "Subway Surfers gameplay no commentary",
-    "PUBG Mobile gameplay no commentary",
-    "Need For Speed gameplay no commentary"
+    "Indian Bike Driving 3D update gameplay",
+    "Indian Bike Driving 3D cheat codes gameplay"
 ]
 MAX_VIDEO_DURATION_MINS = 30 
 
