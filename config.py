@@ -5,9 +5,11 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# API Keys
+# API Keys & Auth Secrets
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID")
+TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
 
 # Directory Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,21 +30,18 @@ QUEUE_FILE = os.path.join(DATA_DIR, "upload_queue.json")
 CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, "client_secret.json")
 
 # Limits & Requirements
-MAX_SUBS = 500000
 MAX_UPLOADS_PER_DAY = 15
 
-# Target Gaming Niches (Strictly GTA 5, GTA 6, and Indian Bike Driving 3D)
-TARGET_NICHES = [
-    "GTA 5 gameplay no commentary",
-    "GTA 5 stunts gameplay",
-    "GTA 5 funny gameplay",
-    "GTA 6 leaks gameplay no commentary",
-    "GTA 6 concept gameplay",
-    "Indian Bike Driving 3D gameplay",
-    "Indian Bike Driving 3D update gameplay",
-    "Indian Bike Driving 3D cheat codes gameplay"
+# Target Twitch Game Categories
+TARGET_GAMES = [
+    "Grand Theft Auto V",
+    "Fortnite",
+    "Minecraft",
+    "Apex Legends",
+    "VALORANT",
+    "Call of Duty: Warzone",
+    "Counter-Strike"
 ]
-MAX_VIDEO_DURATION_MINS = 30 
 
 def setup_secret_files():
     """Auto-populates secret files if environment variables are provided (e.g. in GitHub Actions)."""
@@ -56,12 +55,6 @@ def setup_secret_files():
     if client_secret_env:
         with open(CLIENT_SECRETS_FILE, "w", encoding="utf-8") as f:
             f.write(client_secret_env)
-
-    cookies_txt_env = os.getenv("COOKIES_TXT")
-    cookies_path = os.path.join(BASE_DIR, "cookies.txt")
-    if cookies_txt_env:
-        with open(cookies_path, "w", encoding="utf-8") as f:
-            f.write(cookies_txt_env)
 
 def get_ffmpeg_path():
     """
