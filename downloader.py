@@ -1,11 +1,11 @@
 import os
 import yt_dlp
-from config import RAW_VIDEOS_DIR, get_ffmpeg_path
+from config import RAW_VIDEOS_DIR, BASE_DIR, get_ffmpeg_path
 
 def download_video(video_id):
     """
     Downloads a public video using multi-stage client fallback endpoints 
-    (mweb -> android_vr -> ios) to guarantee success on cloud IPs.
+    with cookie authentication logging.
     """
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
@@ -32,8 +32,18 @@ def download_video(video_id):
     if os.path.exists(local_ffmpeg_dir):
         ydl_opts_base['ffmpeg_location'] = local_ffmpeg_dir
         
-    cookies_path = os.getenv("COOKIES_PATH", "cookies.txt")
+    cookies_env = os.getenv("COOKIES_PATH")
+    if cookies_env and os.path.exists(cookies_env):
+        cookies_path = os.path.abspath(cookies_env)
+    else:
+        cookies_path = os.path.join(BASE_DIR, "cookies.txt")
+
     has_cookies = os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 10
+
+    if has_cookies:
+        print(f"[+] Loaded cookies file: {cookies_path} ({os.path.getsize(cookies_path)} bytes)")
+    else:
+        print("[-] No valid cookies file detected. Running unauthenticated fallback.")
 
     client_stages = [
         ("Mobile Web Client", ['mweb', 'android']),

@@ -48,18 +48,18 @@ def setup_secret_files():
     """Auto-populates secret files if environment variables are provided (e.g. in GitHub Actions)."""
     token_json_env = os.getenv("YOUTUBE_TOKEN_JSON")
     token_path = os.path.join(BASE_DIR, "token.json")
-    if token_json_env and not os.path.exists(token_path):
+    if token_json_env:
         with open(token_path, "w", encoding="utf-8") as f:
             f.write(token_json_env)
 
     client_secret_env = os.getenv("YOUTUBE_CLIENT_SECRET_JSON")
-    if client_secret_env and not os.path.exists(CLIENT_SECRETS_FILE):
+    if client_secret_env:
         with open(CLIENT_SECRETS_FILE, "w", encoding="utf-8") as f:
             f.write(client_secret_env)
 
     cookies_txt_env = os.getenv("COOKIES_TXT")
     cookies_path = os.path.join(BASE_DIR, "cookies.txt")
-    if cookies_txt_env and not os.path.exists(cookies_path):
+    if cookies_txt_env:
         with open(cookies_path, "w", encoding="utf-8") as f:
             f.write(cookies_txt_env)
 
