@@ -28,7 +28,14 @@ def download_video(video_id):
     
     cookies_path = 'cookies.txt'
     if os.path.exists(cookies_path):
-        ydl_opts['cookiefile'] = cookies_path
+        try:
+            with open(cookies_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            # Only use cookie file if it contains actual login/session cookies
+            if any(k in content for k in ['SID', 'LOGIN_INFO', '__Secure-3PAPISID', '__Secure-1PAPISID']):
+                ydl_opts['cookiefile'] = cookies_path
+        except Exception:
+            pass
 
     # If local ffmpeg dir exists, specify it, otherwise yt-dlp uses system ffmpeg
     local_ffmpeg_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg', 'bin')
