@@ -7,6 +7,8 @@ from datetime import datetime
 from config import RAW_VIDEOS_DIR, PROCESSED_DIR, MAX_UPLOADS_PER_DAY
 from twitch_finder import find_twitch_clips, mark_video_seen
 from twitch_downloader import download_twitch_clip
+from face_detector import detect_facecam
+from face_cropper import crop_facecam
 from audio_analyzer import analyze_audio
 from highlight_detector import get_highlights
 from video_processor import process_video
@@ -35,10 +37,11 @@ def run_single_trigger():
     Executes 1 scheduled trigger cycle:
     1. Searches Twitch API for trending clips in game categories.
     2. Downloads candidate clip MP4 into RAW_VIDEOS_DIR.
-    3. Analyzes audio for voice/silence.
-    4. Detects highlights & renders 9:16 vertical 1080p Short (< 45s).
-    5. Generates AI metadata & uploads Short to YouTube.
-    6. Cleans up temporary disk files and exits cleanly.
+    3. Runs AI Facecam Detection & Removal (skips multi-face / >20% face area / centered faces).
+    4. Analyzes audio for voice/silence.
+    5. Detects highlights & renders 9:16 vertical 1080p Short (< 45s).
+    6. Generates AI metadata & uploads Short to YouTube.
+    7. Cleans up temporary disk files and exits cleanly.
     """
     print(f"\n--- Starting Scheduled Action Trigger at {datetime.utcnow().isoformat()} UTC ---")
     
@@ -65,7 +68,26 @@ def run_single_trigger():
             mark_video_seen(video['video_id'])
             continue
             
-        # 2. Analyze Audio
+        # 2. AI Facecam Detection & Removal (Before Audio Analysis)
+        face_result = detect_facecam(video_path)
+        if face_result.get("should_skip"):
+            logging.warning(f"[!] Skipping candidate {video['video_id']}: {face_result.get('skip_reason')}")
+            mark_video_seen(video['video_id'])
+            cleanup_disk()
+            continue
+
+        corner = face_result.get("corner")
+        if corner:
+            logging.info(f"[+] Facecam detected in '{corner}'. Removing facecam...")
+            cropped_path = crop_facecam(video_path, corner)
+            if cropped_path and os.path.exists(cropped_path):
+                video_path = cropped_path
+            else:
+                logging.warning("[!] Facecam cropping failed. Continuing with original video.")
+        else:
+            logging.info("[+] No facecam detected. Proceeding with clean gameplay video.")
+
+        # 3. Analyze Audio
         has_voice, is_silent = analyze_audio(video_path)
         mute_audio = False
         if has_voice:
@@ -77,7 +99,7 @@ def run_single_trigger():
         else:
             logging.info("[+] Clear game audio found. Preserving game audio with BGM.")
             
-        # 3. Highlight Detection
+        # 4. Highlight Detection
         highlights = get_highlights(video_path, num_clips=1)
         if not highlights:
             logging.info("[-] No exciting highlights found.")
@@ -87,7 +109,7 @@ def run_single_trigger():
             
         scene = highlights[0]
         
-        # 4. Process into YouTube Short
+        # 5. Process into YouTube Short (9:16 vertical 1080p)
         out_filename = f"short_{video['video_id']}.mp4"
         processed_path = process_video(
             video_path, 
@@ -103,10 +125,10 @@ def run_single_trigger():
             cleanup_disk()
             continue
             
-        # 5. Metadata Generation
+        # 6. Metadata Generation
         metadata = generate_metadata(video['title'])
         
-        # 6. Upload Short to YouTube
+        # 7. Upload Short to YouTube
         try:
             upload_short(processed_path, metadata)
             logging.info(f"[+] Successfully uploaded Twitch clip {video['video_id']} to YouTube Shorts!")
