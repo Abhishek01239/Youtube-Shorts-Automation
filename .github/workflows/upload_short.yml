@@ -43,15 +43,12 @@ jobs:
         run: |
           python pipeline.py
 
-      - name: Sync branch before commit
+      - name: Commit & Push Updated History
         run: |
           git config user.email "actions@github.com"
           git config user.name "github-actions[bot]"
+          git add data/seen_videos.txt data/upload_log.json
+          git commit -m "auto: update seen_videos.txt and upload_log.json [skip ci]" || echo "No changes to commit"
           git fetch origin main
-          git pull --rebase origin main || true
-
-      - name: Commit & Push Updated History
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "auto: update seen_videos.txt and upload_log.json [skip ci]"
-          file_pattern: "data/seen_videos.txt data/upload_log.json"
+          git rebase -X ours origin/main || git rebase --abort || true
+          git push origin main || true
