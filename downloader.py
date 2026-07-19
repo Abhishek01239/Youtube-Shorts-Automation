@@ -5,8 +5,8 @@ from config import RAW_VIDEOS_DIR, BASE_DIR, get_ffmpeg_path
 
 def download_video(video_id):
     """
-    Downloads a public video using multi-stage client fallback endpoints 
-    with cookie authentication logging & rate limit protections.
+    Downloads a public video using unauthenticated Android VR/Android client APIs 
+    first (bypassing cookie session invalidation), falling back to iOS and cookies.
     """
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
@@ -27,8 +27,8 @@ def download_video(video_id):
         'fragment_retries': 10,
         'file_access_retries': 5,
         'concurrent_fragment_downloads': 4,
-        'sleep_interval': 3,
-        'max_sleep_interval': 5,
+        'sleep_interval': 2,
+        'max_sleep_interval': 4,
     }
     
     local_ffmpeg_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg', 'bin')
@@ -43,22 +43,22 @@ def download_video(video_id):
 
     has_cookies = os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 10
 
-    if has_cookies:
-        print(f"[+] Loaded cookies file: {cookies_path} ({os.path.getsize(cookies_path)} bytes)")
-    else:
-        print("[-] No valid cookies file detected. Running unauthenticated fallback.")
-
-    client_stages = [
-        ("Mobile Web Client", ['mweb', 'android']),
-        ("VR / iOS Client", ['android_vr', 'ios']),
-        ("Standard Client", ['android', 'web'])
+    # Multi-Stage Download Strategy:
+    # Stage 1 & 2 run unauthenticated via Android VR/iOS APIs (which bypass bot checks without triggering cookie session errors)
+    # Stage 3 uses cookies.txt as last resort
+    stages = [
+        ("Android VR API", ['android_vr', 'android'], False),
+        ("iOS & Mobile Web API", ['ios', 'mweb'], False),
+        ("Authenticated Cookie Session", ['android', 'web'], True)
     ]
 
-    for stage_name, clients in client_stages:
+    for stage_name, clients, use_cookies in stages:
         print(f"[*] Downloading {video_id} ({stage_name})...")
         opts = dict(ydl_opts_base)
-        if has_cookies:
+        if use_cookies and has_cookies:
             opts['cookiefile'] = cookies_path
+            print(f"[+] Attaching cookiefile for {stage_name}: {cookies_path}")
+            
         opts['extractor_args'] = {'youtube': {'player_client': clients}}
         
         try:
@@ -67,12 +67,14 @@ def download_video(video_id):
                 base_filename = ydl.prepare_filename(info)
                 final_filename = base_filename.rsplit('.', 1)[0] + '.mp4'
                 if os.path.exists(final_filename):
+                    print(f"[+] Download succeeded via {stage_name}!")
                     return final_filename
                 elif os.path.exists(base_filename):
+                    print(f"[+] Download succeeded via {stage_name}!")
                     return base_filename
         except Exception as e:
             print(f"[!] {stage_name} attempt failed: {e}")
-            time.sleep(2) # Pause between client stage retries
+            time.sleep(2)
             continue
 
     return None
