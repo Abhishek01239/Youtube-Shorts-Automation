@@ -3,7 +3,7 @@ import yt_dlp
 from config import RAW_VIDEOS_DIR, get_ffmpeg_path
 
 def download_video(video_id):
-    """Downloads a public video in best quality up to 1080p using AVC1/VP9 codecs to avoid raw AV1 (.f399) errors."""
+    """Downloads a public video in best quality up to 1080p using mobile player clients to bypass cloud IP bot checks."""
     if not os.path.exists(RAW_VIDEOS_DIR):
         os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
         
@@ -15,6 +15,11 @@ def download_video(video_id):
         'merge_output_format': 'mp4',
         'postprocessor_args': {
             'ffmpeg': ['-strict', 'experimental', '-c:v', 'copy', '-c:a', 'aac']
+        },
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'mweb']
+            }
         },
         'quiet': True,
         'no_warnings': True,
