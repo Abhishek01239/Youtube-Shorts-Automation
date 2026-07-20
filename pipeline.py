@@ -3,7 +3,7 @@ import sys
 import time
 import argparse
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import RAW_VIDEOS_DIR, PROCESSED_DIR, MAX_UPLOADS_PER_DAY
 from twitch_finder import find_twitch_clips, mark_video_seen
 from twitch_downloader import download_twitch_clip
@@ -30,13 +30,13 @@ def cleanup_disk():
                 except Exception as e:
                     logging.warning(f"Failed to delete {file_path}: {e}")
 
-def run_single_trigger(target_uploads=3):
+def run_single_trigger(target_uploads=6, interval_hours=2):
     """
-    Executes a daily batch run:
-    Fetches Twitch clips, processes them into Shorts, and uploads up to `target_uploads` Shorts 
-    in one single execution before finishing and going to sleep.
+    Executes 1 daily batch run:
+    Fetches Twitch clips, processes them into Shorts, and uploads `target_uploads` Shorts in 1 single execution.
+    Schedules each video with a minimum gap of `interval_hours` (2 hours) apart on YouTube!
     """
-    print(f"\n--- Starting Daily Batch Automation Trigger ({target_uploads} Shorts) at {datetime.utcnow().isoformat()} UTC ---")
+    print(f"\n--- Starting Scheduled Daily Batch Automation ({target_uploads} Shorts, {interval_hours}h Spacing) at {datetime.utcnow().isoformat()} UTC ---")
     
     uploads_today = get_upload_count_today()
     logging.info(f"[*] Total uploads recorded today prior to run: {uploads_today}/{MAX_UPLOADS_PER_DAY}")
@@ -49,11 +49,15 @@ def run_single_trigger(target_uploads=3):
     if not videos:
         logging.warning("[-] No suitable unseen clips found on Twitch.")
         return False
+
+    now_utc = datetime.utcnow()
+    # First scheduled video releases 2 hours after batch creation time
+    base_publish_time = now_utc + timedelta(hours=interval_hours)
         
     uploaded_count = 0
     for video in videos:
         if uploaded_count >= target_uploads:
-            logging.info(f"[+] Target batch goal of {target_uploads} Shorts uploaded successfully for today!")
+            logging.info(f"[+] Target batch goal of {target_uploads} scheduled Shorts achieved for today!")
             break
 
         logging.info(f"\n>>> Processing Candidate [{uploaded_count + 1}/{target_uploads}]: {video['title']} (ID: {video['video_id']}) [{video['game_name']}]")
@@ -106,11 +110,14 @@ def run_single_trigger(target_uploads=3):
         # 5. Metadata Generation
         metadata = generate_metadata(video['title'])
         
-        # 6. Upload Short to YouTube
+        # 6. Calculate Scheduled Publish Time (2 Hours Gap per Video)
+        scheduled_time = base_publish_time + timedelta(hours=uploaded_count * interval_hours)
+        
+        # 7. Upload & Schedule Short on YouTube
         try:
-            upload_short(processed_path, metadata)
+            upload_short(processed_path, metadata, schedule_time=scheduled_time)
             uploaded_count += 1
-            logging.info(f"[+] ({uploaded_count}/{target_uploads}) Successfully uploaded Twitch clip {video['video_id']} to YouTube Shorts!")
+            logging.info(f"[+] ({uploaded_count}/{target_uploads}) Successfully uploaded & scheduled Twitch clip {video['video_id']} for release at {scheduled_time.strftime('%H:%M')} UTC!")
         except Exception as e:
             logging.error(f"[!] Upload failed: {e}")
             
@@ -120,16 +127,17 @@ def run_single_trigger(target_uploads=3):
         # Sleep 5 seconds between batch uploads
         time.sleep(5)
 
-    print(f"--- Daily Batch Trigger Finished (Total Shorts Uploaded: {uploaded_count}) ---")
+    print(f"--- Daily Scheduled Batch Trigger Finished (Total Shorts Scheduled: {uploaded_count}) ---")
     return uploaded_count > 0
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Twitch to YouTube Shorts Automation Pipeline")
-    parser.add_argument("--count", type=int, default=3, help="Number of Shorts to generate and upload in one daily batch run (default: 3)")
+    parser = argparse.ArgumentParser(description="Twitch to YouTube Shorts Scheduled Automation Pipeline")
+    parser.add_argument("--count", type=int, default=6, help="Number of Shorts to generate and schedule in one daily batch run (default: 6)")
+    parser.add_argument("--gap", type=int, default=2, help="Minimum gap in hours between scheduled video releases (default: 2)")
     parser.add_argument("--loop", action="store_true", help="Run continuously in 24/7 loop mode instead of single trigger mode")
     args = parser.parse_args()
 
-    print("🤖 Twitch to YouTube Shorts Automation Bot Initiated 🤖")
+    print("🤖 Twitch to YouTube Shorts Scheduled Automation Bot Initiated 🤖")
     
     # Authenticate YouTube service for uploading
     logging.info("[*] Verifying YouTube Uploader Credentials...")
@@ -144,13 +152,13 @@ if __name__ == "__main__":
         logging.info("[*] Running in continuous loop mode...")
         while True:
             try:
-                run_single_trigger(target_uploads=args.count)
+                run_single_trigger(target_uploads=args.count, interval_hours=args.gap)
                 logging.info("[*] Sleeping 24 hours until next daily batch cycle...")
                 time.sleep(86400)
             except Exception as e:
                 logging.error(f"[!] Pipeline crashed: {e}")
                 time.sleep(300)
     else:
-        logging.info(f"[*] Running daily batch trigger mode ({args.count} Shorts per execution)...")
-        run_single_trigger(target_uploads=args.count)
+        logging.info(f"[*] Running daily scheduled batch mode ({args.count} Shorts, {args.gap}h gap)...")
+        run_single_trigger(target_uploads=args.count, interval_hours=args.gap)
         sys.exit(0)

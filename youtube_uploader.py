@@ -56,7 +56,7 @@ def log_upload(video_id):
 def upload_short(video_path, metadata, schedule_time=None):
     """
     Uploads a short to YouTube via OAuth2.
-    Ensures #shorts tag is present in title to auto-categorize video as a YouTube Short.
+    If schedule_time is provided, sets privacyStatus to 'private' and publishAt to future UTC timestamp.
     """
     print(f"[*] Uploading {video_path} to YouTube Shorts...")
     youtube = get_authenticated_service()
@@ -66,10 +66,11 @@ def upload_short(video_path, metadata, schedule_time=None):
     if "#shorts" not in description.lower():
         description += " #shorts"
 
-    # Ensure #shorts tag is explicitly in title for Shorts classification
     title = metadata['title']
     if "#shorts" not in title.lower():
         title = f"{title[:75]} #shorts"
+
+    privacy = 'private' if schedule_time else 'public'
 
     body = {
         'snippet': {
@@ -79,13 +80,15 @@ def upload_short(video_path, metadata, schedule_time=None):
             'categoryId': '20' # Gaming
         },
         'status': {
-            'privacyStatus': 'private' if schedule_time else 'public',
+            'privacyStatus': privacy,
             'selfDeclaredMadeForKids': False
         }
     }
     
     if schedule_time:
-        body['status']['publishAt'] = schedule_time.isoformat() + 'Z'
+        formatted_publish_time = schedule_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+        body['status']['publishAt'] = formatted_publish_time
+        print(f"[*] Scheduling video for future release at {formatted_publish_time} UTC (Privacy: Private -> Scheduled Public)")
 
     media = MediaFileUpload(video_path, mimetype='video/mp4', resumable=True)
     
