@@ -32,14 +32,14 @@ CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, "client_secret.json")
 # Limits & Requirements
 MAX_UPLOADS_PER_DAY = 15
 
-# Target Gaming Categories (Strictly COD, Indian Bike Driving 3D, GTA 5, GTA 6, and VALORANT)
+# Target Gaming Categories (Strictly GTA 5, GTA 6, Indian Bike Driving 3D, and Call of Duty ONLY)
 TARGET_GAMES = [
     "Grand Theft Auto V",
     "Grand Theft Auto VI",
-    "VALORANT",
+    "Indian Bike Driving 3D",
     "Call of Duty: Warzone",
     "Call of Duty: Modern Warfare III",
-    "Indian Bike Driving 3D"
+    "Call of Duty: Black Ops 6"
 ]
 
 def setup_secret_files():
