@@ -2,8 +2,8 @@ name: Scheduled Twitch to YouTube Shorts Automation
 
 on:
   schedule:
-    # Trigger ONCE daily at 00:30 UTC (06:00 AM IST)
-    - cron: '30 0 * * *'
+    # Trigger TWICE daily at 00:30 UTC (06:00 AM IST) and 12:30 UTC (06:00 PM IST)
+    - cron: '30 0,12 * * *'
   workflow_dispatch:
 
 permissions:
@@ -32,7 +32,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Execute Daily Batch Shorts Automation (3 Shorts Uploaded)
+      - name: Execute Daily Batch Shorts Automation (3 Shorts Uploaded Per Run = 6 Daily)
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
