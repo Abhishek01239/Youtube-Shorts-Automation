@@ -30,20 +30,16 @@ def cleanup_disk():
                 except Exception as e:
                     logging.warning(f"Failed to delete {file_path}: {e}")
 
-def run_single_trigger():
+def run_single_trigger(target_uploads=3):
     """
-    Executes 1 scheduled trigger cycle:
-    1. Searches Twitch API for trending clips in target game categories.
-    2. Downloads candidate clip MP4 into RAW_VIDEOS_DIR.
-    3. Analyzes audio for voice/silence.
-    4. Detects highlights & renders 9:16 vertical 1080p Short (< 45s).
-    5. Generates AI metadata & uploads Short to YouTube.
-    6. Cleans up temporary disk files and exits cleanly.
+    Executes a daily batch run:
+    Fetches Twitch clips, processes them into Shorts, and uploads up to `target_uploads` Shorts 
+    in one single execution before finishing and going to sleep.
     """
-    print(f"\n--- Starting Scheduled Action Trigger at {datetime.utcnow().isoformat()} UTC ---")
+    print(f"\n--- Starting Daily Batch Automation Trigger ({target_uploads} Shorts) at {datetime.utcnow().isoformat()} UTC ---")
     
     uploads_today = get_upload_count_today()
-    logging.info(f"[*] Total uploads recorded today: {uploads_today}/{MAX_UPLOADS_PER_DAY}")
+    logging.info(f"[*] Total uploads recorded today prior to run: {uploads_today}/{MAX_UPLOADS_PER_DAY}")
     
     if uploads_today >= MAX_UPLOADS_PER_DAY:
         logging.info(f"[!] Daily quota limit reached ({uploads_today}/{MAX_UPLOADS_PER_DAY}). Exiting gracefully.")
@@ -54,9 +50,13 @@ def run_single_trigger():
         logging.warning("[-] No suitable unseen clips found on Twitch.")
         return False
         
-    uploaded = False
+    uploaded_count = 0
     for video in videos:
-        logging.info(f"\n>>> Processing Candidate: {video['title']} (ID: {video['video_id']}) [{video['game_name']}]")
+        if uploaded_count >= target_uploads:
+            logging.info(f"[+] Target batch goal of {target_uploads} Shorts uploaded successfully for today!")
+            break
+
+        logging.info(f"\n>>> Processing Candidate [{uploaded_count + 1}/{target_uploads}]: {video['title']} (ID: {video['video_id']}) [{video['game_name']}]")
         time.sleep(2)
         
         # 1. Download Twitch Clip
@@ -109,22 +109,23 @@ def run_single_trigger():
         # 6. Upload Short to YouTube
         try:
             upload_short(processed_path, metadata)
-            logging.info(f"[+] Successfully uploaded Twitch clip {video['video_id']} to YouTube Shorts!")
-            uploaded = True
+            uploaded_count += 1
+            logging.info(f"[+] ({uploaded_count}/{target_uploads}) Successfully uploaded Twitch clip {video['video_id']} to YouTube Shorts!")
         except Exception as e:
             logging.error(f"[!] Upload failed: {e}")
             
         mark_video_seen(video['video_id'])
         cleanup_disk()
         
-        if uploaded:
-            break
+        # Sleep 5 seconds between batch uploads
+        time.sleep(5)
 
-    print(f"--- Trigger Execution Finished (Uploaded: {uploaded}) ---")
-    return uploaded
+    print(f"--- Daily Batch Trigger Finished (Total Shorts Uploaded: {uploaded_count}) ---")
+    return uploaded_count > 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Twitch to YouTube Shorts Automation Pipeline")
+    parser.add_argument("--count", type=int, default=3, help="Number of Shorts to generate and upload in one daily batch run (default: 3)")
     parser.add_argument("--loop", action="store_true", help="Run continuously in 24/7 loop mode instead of single trigger mode")
     args = parser.parse_args()
 
@@ -143,13 +144,13 @@ if __name__ == "__main__":
         logging.info("[*] Running in continuous loop mode...")
         while True:
             try:
-                run_single_trigger()
-                logging.info("[*] Sleeping 3 hours until next cycle...")
-                time.sleep(10800)
+                run_single_trigger(target_uploads=args.count)
+                logging.info("[*] Sleeping 24 hours until next daily batch cycle...")
+                time.sleep(86400)
             except Exception as e:
                 logging.error(f"[!] Pipeline crashed: {e}")
                 time.sleep(300)
     else:
-        logging.info("[*] Running single trigger mode (1 Short upload per trigger execution)...")
-        run_single_trigger()
+        logging.info(f"[*] Running daily batch trigger mode ({args.count} Shorts per execution)...")
+        run_single_trigger(target_uploads=args.count)
         sys.exit(0)
