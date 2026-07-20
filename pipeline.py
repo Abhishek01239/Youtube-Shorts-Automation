@@ -3,7 +3,7 @@ import sys
 import time
 import argparse
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from config import RAW_VIDEOS_DIR, PROCESSED_DIR, MAX_UPLOADS_PER_DAY
 from twitch_finder import find_twitch_clips, mark_video_seen
 from twitch_downloader import download_twitch_clip
@@ -36,7 +36,8 @@ def run_single_trigger(target_uploads=6, interval_hours=2):
     Fetches Twitch clips, processes them into Shorts, and uploads `target_uploads` Shorts in 1 single execution.
     Schedules each video with a minimum gap of `interval_hours` (2 hours) apart on YouTube!
     """
-    print(f"\n--- Starting Scheduled Daily Batch Automation ({target_uploads} Shorts, {interval_hours}h Spacing) at {datetime.utcnow().isoformat()} UTC ---")
+    now_utc = datetime.now(timezone.utc)
+    print(f"\n--- Starting Scheduled Daily Batch Automation ({target_uploads} Shorts, {interval_hours}h Spacing) at {now_utc.isoformat()} ---")
     
     uploads_today = get_upload_count_today()
     logging.info(f"[*] Total uploads recorded today prior to run: {uploads_today}/{MAX_UPLOADS_PER_DAY}")
@@ -50,7 +51,6 @@ def run_single_trigger(target_uploads=6, interval_hours=2):
         logging.warning("[-] No suitable unseen clips found on Twitch.")
         return False
 
-    now_utc = datetime.utcnow()
     # First scheduled video releases 2 hours after batch creation time
     base_publish_time = now_utc + timedelta(hours=interval_hours)
         
