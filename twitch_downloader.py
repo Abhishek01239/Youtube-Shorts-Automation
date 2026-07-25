@@ -4,7 +4,7 @@ import time
 import logging
 import requests
 import yt_dlp
-from config import RAW_VIDEOS_DIR, get_ffmpeg_path
+import config
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -43,12 +43,13 @@ def download_file_http(url, out_path, retries=3):
 
 def download_twitch_clip(video_data):
     """
-    Downloads a Twitch clip MP4 and saves it to RAW_VIDEOS_DIR.
+    Downloads a Twitch clip MP4 and saves it to raw videos directory.
     video_data: dict with 'video_id', 'url', 'thumbnail_url'
     Returns absolute path to downloaded MP4 file or None on failure.
     """
-    if not os.path.exists(RAW_VIDEOS_DIR):
-        os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
+    raw_videos_dir = config.get_raw_videos_dir()
+    if not os.path.exists(raw_videos_dir):
+        os.makedirs(raw_videos_dir, exist_ok=True)
 
     if isinstance(video_data, str):
         clip_id = video_data
@@ -59,7 +60,7 @@ def download_twitch_clip(video_data):
         clip_url = video_data.get("url", f"https://clips.twitch.tv/{clip_id}")
         thumbnail_url = video_data.get("thumbnail_url")
 
-    out_file = os.path.join(RAW_VIDEOS_DIR, f"{clip_id}.mp4")
+    out_file = os.path.join(raw_videos_dir, f"{clip_id}.mp4")
 
     # Method 1: Direct Twitch CDN Fast Download
     direct_mp4 = get_direct_cdn_mp4_url(thumbnail_url)
@@ -70,7 +71,7 @@ def download_twitch_clip(video_data):
 
     # Method 2: Fallback yt-dlp Native Twitch Extractor
     logging.info(f"[*] Fallback yt-dlp downloading Twitch clip: {clip_url}")
-    out_tmpl = os.path.join(RAW_VIDEOS_DIR, f"{clip_id}.%(ext)s")
+    out_tmpl = os.path.join(raw_videos_dir, f"{clip_id}.%(ext)s")
 
     ydl_opts = {
         'format': 'best',

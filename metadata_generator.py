@@ -2,16 +2,17 @@ import json
 from groq import Groq
 from config import GROQ_API_KEY
 
-def generate_metadata(video_title):
+def generate_metadata(video_title, niche="gaming"):
     """
     Uses Groq API (Llama 3.3 70B) to generate a clickable title, description, and tags.
     """
-    print("[*] Generating AI Metadata...")
+    print(f"[*] Generating AI Metadata for niche '{niche}'...")
+    niche_clean = "".join(c for c in niche if c.isalnum())
     fallback_data = {
-        "title": "Epic Minecraft Moment 😱 #shorts",
-        "description": "Wait for the end of this crazy Minecraft gameplay!\n\n👍 Like and Subscribe for more amazing clips!\n\n#minecraft #shorts #gaming",
-        "hashtags": ["#shorts", "#minecraft", "#gaming", "#minecraftshorts", "#gamer", "#mcpe", "#minecrafter", "#minecraftclips", "#epic", "#gameplay"],
-        "tags": "minecraft,shorts,gaming,gameplay,minecraft shorts,epic,funny,mcpe,survival,speedrun,pro,noob,moments,highlights,clip,gamer,video games,bedrock,java,creeper"
+        "title": f"Epic {niche.capitalize()} Moment 😱 #shorts",
+        "description": f"Wait for the end of this crazy {niche} video!\n\n👍 Like and Subscribe for more amazing clips!\n\n#{niche_clean} #shorts",
+        "hashtags": ["#shorts", f"#{niche_clean}", "#epic", "#moments", "#highlights", "#clip", "#viral"],
+        "tags": f"{niche},shorts,epic,funny,moments,highlights,clip,viral,video"
     }
     
     if not GROQ_API_KEY:
@@ -21,14 +22,14 @@ def generate_metadata(video_title):
     client = Groq(api_key=GROQ_API_KEY)
     
     prompt = f"""
-    You are an expert YouTube Shorts creator. Generate metadata for a gaming Shorts video curated from a video titled: "{video_title}".
+    You are an expert YouTube Shorts creator. Generate metadata for a Shorts video in the "{niche}" niche, curated from a video titled: "{video_title}".
     
     Output strictly in this JSON format:
     {{
         "title": "<Click-worthy title under 80 characters with 1-2 emojis>",
         "description": "<SEO friendly description under 300 characters, ending with a Call to Action>",
-        "hashtags": ["#shorts", "#gaming", ... 8 more relevant tags based on the game],
-        "tags": "comma, separated, list, of, 20, youtube, seo, tags, related, to, the, specific, game"
+        "hashtags": ["#shorts", ... 9 more relevant tags based on the niche],
+        "tags": "comma, separated, list, of, 20, youtube, seo, tags, related to this niche/video"
     }}
     """
     

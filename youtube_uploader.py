@@ -6,28 +6,70 @@ from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from config import CLIENT_SECRETS_FILE, UPLOAD_LOG_FILE
+from google.auth.exceptions import TransportError
+import config
 
 SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
 
-def get_authenticated_service():
+def get_authenticated_service(token_info=None, token_path=None):
     creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    
+    # Resolve the token path to save refreshed/new credentials
+    target_token_path = token_path or config.get_token_file()
+    
+    # 1. Try to load from provided token_info dict
+    if token_info and isinstance(token_info, dict):
+        try:
+            creds = Credentials.from_authorized_user_info(token_info, SCOPES)
+        except Exception as e:
+            print(f"[!] Error building credentials from token_info dict: {e}")
+            
+    # 2. Try to load from channel token file path if dict load failed or wasn't provided
+    if not creds:
+        if os.path.exists(target_token_path):
+            try:
+                creds = Credentials.from_authorized_user_file(target_token_path, SCOPES)
+            except Exception as e:
+                print(f"[!] Error reading authorized user file {target_token_path}: {e}")
+        elif os.path.exists('token.json'):
+            # Backward compatibility fallback
+            try:
+                creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+                target_token_path = 'token.json'
+            except Exception as e:
+                print(f"[!] Error reading fallback token.json: {e}")
+
+    # 3. Refresh or authenticate via flow
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRETS_FILE, SCOPES)
+            try:
+                creds.refresh(Request())
+            except TransportError as te:
+                print(f"[!] Network connection error during token refresh: {te}")
+                raise te
+            except Exception as e:
+                print(f"[!] Failed to refresh credentials: {e}. Falling back to InstalledAppFlow.")
+                creds = None
+                
+        if not creds:
+            flow = InstalledAppFlow.from_client_secrets_file(config.CLIENT_SECRETS_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
-        with open('token.json', 'w') as token:
+            
+        # Ensure parent directory exists for token path
+        parent_dir = os.path.dirname(os.path.abspath(target_token_path))
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+            
+        with open(target_token_path, 'w', encoding='utf-8') as token:
             token.write(creds.to_json())
+            
     return build('youtube', 'v3', credentials=creds)
 
 def get_upload_count_today():
-    if not os.path.exists(UPLOAD_LOG_FILE):
+    log_file = config.get_upload_log_file()
+    if not os.path.exists(log_file):
         return 0
-    with open(UPLOAD_LOG_FILE, 'r') as f:
+    with open(log_file, 'r', encoding='utf-8') as f:
         try:
             logs = json.load(f)
             today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
@@ -36,9 +78,10 @@ def get_upload_count_today():
             return 0
 
 def log_upload(video_id):
+    log_file = config.get_upload_log_file()
     logs = []
-    if os.path.exists(UPLOAD_LOG_FILE):
-        with open(UPLOAD_LOG_FILE, 'r') as f:
+    if os.path.exists(log_file):
+        with open(log_file, 'r', encoding='utf-8') as f:
             try:
                 logs = json.load(f)
             except:
@@ -50,16 +93,21 @@ def log_upload(video_id):
         'time': datetime.now(timezone.utc).isoformat()
     })
     
-    with open(UPLOAD_LOG_FILE, 'w') as f:
+    # Ensure parent dir exists
+    parent_dir = os.path.dirname(os.path.abspath(log_file))
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+        
+    with open(log_file, 'w', encoding='utf-8') as f:
         json.dump(logs, f, indent=4)
 
-def upload_short(video_path, metadata, schedule_time=None):
+def upload_short(video_path, metadata, schedule_time=None, token_info=None, token_path=None):
     """
     Uploads a short to YouTube via OAuth2.
     If schedule_time is provided, sets privacyStatus to 'private' and publishAt to future ISO 8601 UTC timestamp.
     """
     print(f"[*] Uploading {video_path} to YouTube Shorts...")
-    youtube = get_authenticated_service()
+    youtube = get_authenticated_service(token_info=token_info, token_path=token_path)
 
     tags = [t.strip() for t in metadata['tags'].split(',')] if isinstance(metadata['tags'], str) else metadata['tags']
     description = metadata['description'] + "\n\n" + " ".join(metadata['hashtags'])

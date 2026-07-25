@@ -14,20 +14,79 @@ TWITCH_CLIENT_SECRET = (os.getenv("TWITCH_CLIENT_SECRET") or "").strip()
 # Directory Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-RAW_VIDEOS_DIR = os.path.join(DATA_DIR, "raw_videos")
-CLIPS_DIR = os.path.join(DATA_DIR, "clips")
-PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
-THUMBNAILS_DIR = os.path.join(DATA_DIR, "thumbnails")
+
+ACTIVE_CHANNEL_NAME = None
+
+def set_active_channel(channel_name):
+    global ACTIVE_CHANNEL_NAME
+    ACTIVE_CHANNEL_NAME = channel_name
+
+def get_channel_dir():
+    if ACTIVE_CHANNEL_NAME:
+        sanitized = "".join([c if c.isalnum() else "_" for c in ACTIVE_CHANNEL_NAME])
+        path = os.path.join(DATA_DIR, "channels", sanitized)
+        os.makedirs(path, exist_ok=True)
+        return path
+    return DATA_DIR
+
+def get_raw_videos_dir():
+    d = os.path.join(get_channel_dir(), "raw_videos")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def get_clips_dir():
+    d = os.path.join(get_channel_dir(), "clips")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def get_processed_dir():
+    d = os.path.join(get_channel_dir(), "processed")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def get_thumbnails_dir():
+    d = os.path.join(get_channel_dir(), "thumbnails")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def get_seen_videos_file():
+    return os.path.join(get_channel_dir(), "seen_videos.txt")
+
+def get_upload_log_file():
+    return os.path.join(get_channel_dir(), "upload_log.json")
+
+def get_queue_file():
+    return os.path.join(get_channel_dir(), "upload_queue.json")
+
+def get_token_file():
+    return os.path.join(get_channel_dir(), "token.json")
+
+CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, "client_secret.json")
+
+# Default fallbacks
+TARGET_NICHES = ["gaming"]
+MAX_SUBS = 100000
+
+def __getattr__(name):
+    if name == "RAW_VIDEOS_DIR":
+        return get_raw_videos_dir()
+    if name == "PROCESSED_DIR":
+        return get_processed_dir()
+    if name == "CLIPS_DIR":
+        return get_clips_dir()
+    if name == "THUMBNAILS_DIR":
+        return get_thumbnails_dir()
+    if name == "SEEN_VIDEOS_FILE":
+        return get_seen_videos_file()
+    if name == "UPLOAD_LOG_FILE":
+        return get_upload_log_file()
+    if name == "QUEUE_FILE":
+        return get_queue_file()
+    raise AttributeError(f"module {__name__} has no attribute {name}")
 
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 BGM_DIR = os.path.join(ASSETS_DIR, "background_music")
 FONTS_DIR = os.path.join(ASSETS_DIR, "fonts")
-
-# Persistence Files
-SEEN_VIDEOS_FILE = os.path.join(DATA_DIR, "seen_videos.txt")
-UPLOAD_LOG_FILE = os.path.join(DATA_DIR, "upload_log.json")
-QUEUE_FILE = os.path.join(DATA_DIR, "upload_queue.json")
-CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, "client_secret.json")
 
 # Limits & Requirements
 MAX_UPLOADS_PER_DAY = 15
@@ -54,6 +113,16 @@ def setup_secret_files():
     if client_secret_env:
         with open(CLIENT_SECRETS_FILE, "w", encoding="utf-8") as f:
             f.write(client_secret_env)
+
+    # Support channel-specific tokens from environment variables on GitHub Actions
+    for key, value in os.environ.items():
+        if key.startswith("YOUTUBE_TOKEN_JSON_"):
+            channel_name = key[len("YOUTUBE_TOKEN_JSON_"):]
+            sanitized = "".join([c if c.isalnum() else "_" for c in channel_name])
+            path = os.path.join(DATA_DIR, "channels", sanitized, "token.json")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(value)
 
 def get_ffmpeg_path():
     """

@@ -1,29 +1,30 @@
 import os
 import random
 import ffmpeg
-from config import PROCESSED_DIR, BGM_DIR, FONTS_DIR, get_ffmpeg_path
+import config
 
 def get_random_bgm():
-    if not os.path.exists(BGM_DIR): return None
-    files = [f for f in os.listdir(BGM_DIR) if f.endswith('.mp3')]
+    if not os.path.exists(config.BGM_DIR): return None
+    files = [f for f in os.listdir(config.BGM_DIR) if f.endswith('.mp3')]
     if not files: return None
-    return os.path.join(BGM_DIR, random.choice(files))
+    return os.path.join(config.BGM_DIR, random.choice(files))
 
 def get_font_path():
-    if not os.path.exists(FONTS_DIR): return None
-    files = [f for f in os.listdir(FONTS_DIR) if f.endswith('.ttf')]
+    if not os.path.exists(config.FONTS_DIR): return None
+    files = [f for f in os.listdir(config.FONTS_DIR) if f.endswith('.ttf')]
     if not files: return None
-    return os.path.join(FONTS_DIR, files[0])
+    return os.path.join(config.FONTS_DIR, files[0])
 
 def process_video(video_path, start, end, output_filename, mute_original=False):
     """
     Processes a landscape gameplay video into a high-quality YouTube Short.
     Guarantees strict duration <= 45s for YouTube Shorts compliance.
     """
-    if not os.path.exists(PROCESSED_DIR):
-        os.makedirs(PROCESSED_DIR, exist_ok=True)
+    processed_dir = config.get_processed_dir()
+    if not os.path.exists(processed_dir):
+        os.makedirs(processed_dir, exist_ok=True)
         
-    out_path = os.path.join(PROCESSED_DIR, output_filename)
+    out_path = os.path.join(processed_dir, output_filename)
     
     # Cap raw clip duration to 45s max (speedup 1.2x produces ~37s Short)
     clip_duration = min(max(end - start, 15.0), 45.0)
@@ -96,7 +97,7 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
         out = ffmpeg.output(v, audio, out_path, **kwargs)
         
     try:
-        ffmpeg_cmd = get_ffmpeg_path()
+        ffmpeg_cmd = config.get_ffmpeg_path()
         out.run(overwrite_output=True, cmd=ffmpeg_cmd)
         print(f"[+] YouTube Short saved: {out_path}")
         return out_path

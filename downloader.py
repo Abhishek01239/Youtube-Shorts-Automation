@@ -1,17 +1,18 @@
 import os
 import time
 import yt_dlp
-from config import RAW_VIDEOS_DIR, BASE_DIR, get_ffmpeg_path
+import config
 
 def download_video(video_id):
     """
     Downloads a public video using multi-stage client fallback endpoints 
     with cookie authentication logging & verbose diagnostics.
     """
-    if not os.path.exists(RAW_VIDEOS_DIR):
-        os.makedirs(RAW_VIDEOS_DIR, exist_ok=True)
+    raw_dir = config.get_raw_videos_dir()
+    if not os.path.exists(raw_dir):
+        os.makedirs(raw_dir, exist_ok=True)
         
-    out_tmpl = os.path.join(RAW_VIDEOS_DIR, f"{video_id}.%(ext)s")
+    out_tmpl = os.path.join(raw_dir, f"{video_id}.%(ext)s")
     
     ydl_opts_base = {
         'format': 'bestvideo[height<=1080]+bestaudio/best',
@@ -40,7 +41,7 @@ def download_video(video_id):
     if cookies_env and os.path.exists(cookies_env):
         cookies_path = os.path.abspath(cookies_env)
     else:
-        cookies_path = os.path.join(BASE_DIR, "cookies.txt")
+        cookies_path = os.path.join(config.BASE_DIR, "cookies.txt")
 
     has_cookies = os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 10
 

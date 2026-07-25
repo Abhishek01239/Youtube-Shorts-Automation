@@ -2,7 +2,7 @@ import os
 import random
 import requests
 import logging
-from config import TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET, TARGET_GAMES, SEEN_VIDEOS_FILE
+import config
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -17,8 +17,8 @@ def get_twitch_access_token():
     if _TWITCH_TOKEN:
         return _TWITCH_TOKEN
 
-    client_id = (TWITCH_CLIENT_ID or "").strip()
-    client_secret = (TWITCH_CLIENT_SECRET or "").strip()
+    client_id = (config.TWITCH_CLIENT_ID or "").strip()
+    client_secret = (config.TWITCH_CLIENT_SECRET or "").strip()
 
     if not client_id or not client_secret:
         logging.error("TWITCH_CLIENT_ID or TWITCH_CLIENT_SECRET environment variable is missing!")
@@ -44,14 +44,19 @@ def get_twitch_access_token():
 
 def get_seen_videos():
     """Reads seen video/clip IDs from the persistence file."""
-    if not os.path.exists(SEEN_VIDEOS_FILE):
+    seen_file = config.get_seen_videos_file()
+    if not os.path.exists(seen_file):
         return set()
-    with open(SEEN_VIDEOS_FILE, "r", encoding="utf-8") as f:
+    with open(seen_file, "r", encoding="utf-8") as f:
         return set(line.strip() for line in f.readlines() if line.strip())
 
 def mark_video_seen(video_id):
     """Appends a clip ID to the seen videos file."""
-    with open(SEEN_VIDEOS_FILE, "a", encoding="utf-8") as f:
+    seen_file = config.get_seen_videos_file()
+    parent_dir = os.path.dirname(os.path.abspath(seen_file))
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+    with open(seen_file, "a", encoding="utf-8") as f:
         f.write(f"{video_id}\n")
 
 def get_game_id(game_name, headers):
@@ -67,7 +72,7 @@ def get_game_id(game_name, headers):
         logging.warning(f"[!] Could not resolve game ID for '{game_name}': {e}")
     return None
 
-def find_twitch_clips():
+def find_twitch_clips(target_games=None):
     """
     Queries Twitch Helix API for top trending clips across target game categories.
     Iterates through games until fresh unseen candidate clips are found.
@@ -77,14 +82,14 @@ def find_twitch_clips():
         logging.error("Failed to authenticate with Twitch API.")
         return []
 
-    client_id = (TWITCH_CLIENT_ID or "").strip()
+    client_id = (config.TWITCH_CLIENT_ID or "").strip()
     headers = {
         "Client-ID": client_id,
         "Authorization": f"Bearer {token}"
     }
 
     seen = get_seen_videos()
-    games = list(TARGET_GAMES)
+    games = list(target_games) if target_games is not None else list(config.TARGET_GAMES)
     random.shuffle(games)
 
     candidates = []

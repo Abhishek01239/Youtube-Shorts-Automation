@@ -5,7 +5,7 @@ __pycache__/
 
 # Credentials & environment variables (Do NOT commit sensitive tokens!)
 .env
-token.json
+**/token.json
 client_secret.json
 cookies.txt
 oauth_state.json
@@ -22,6 +22,10 @@ ffmpeg-*/
 *.tar.xz
 *.mp4
 *.wav
+
+# Local run reports
+data/latest_run_report.json
+data/reports/
 
 # OS & IDE
 .DS_Store
