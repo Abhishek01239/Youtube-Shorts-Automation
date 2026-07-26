@@ -213,13 +213,15 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 "title": metadata['title'],
                 "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             })
+            if source_type == "twitch":
+                mark_twitch_seen(video['video_id'])
+            else:
+                mark_youtube_seen(video['video_id'])
         except Exception as e:
-            logging.error(f"[!] Upload failed: {e}")
+            logging.error(f"[!] Upload failed for video {video['video_id']}: {e}")
+            cleanup_disk()
+            break
             
-        if source_type == "twitch":
-            mark_twitch_seen(video['video_id'])
-        else:
-            mark_youtube_seen(video['video_id'])
         cleanup_disk()
         
         time.sleep(5)
