@@ -142,13 +142,17 @@ def setup_secret_files():
     # Support channel-specific tokens from environment variables on GitHub Actions
     for key, value in os.environ.items():
         if key.startswith("YOUTUBE_TOKEN_JSON_"):
+            token_val = (value or "").strip()
+            if not token_val:
+                print(f"[!] Warning: Environment variable {key} is empty. Skipping writing to token file.")
+                continue
             channel_name = key[len("YOUTUBE_TOKEN_JSON_"):]
             actual_channel_name = channel_name_map.get(channel_name.upper(), channel_name)
             sanitized = "".join([c if c.isalnum() else "_" for c in actual_channel_name])
             path = os.path.join(DATA_DIR, "channels", sanitized, "token.json")
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
-                f.write(value)
+                f.write(token_val)
 
 def get_ffmpeg_path():
     """
