@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from datetime import datetime, timezone
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -22,7 +23,7 @@ def get_authenticated_service(token_info=None, token_path=None):
         try:
             creds = Credentials.from_authorized_user_info(token_info, SCOPES)
         except Exception as e:
-            print(f"[!] Error building credentials from token_info dict: {e}")
+            logging.error(f"[!] Error building credentials from token_info dict: {e}")
             
     # 2. Try to load from channel token file path if dict load failed or wasn't provided
     if not creds:
@@ -30,28 +31,31 @@ def get_authenticated_service(token_info=None, token_path=None):
             try:
                 creds = Credentials.from_authorized_user_file(target_token_path, SCOPES)
             except Exception as e:
-                print(f"[!] Error reading authorized user file {target_token_path}: {e}")
+                logging.error(f"[!] Error reading authorized user file {target_token_path}: {e}")
         elif os.path.exists('token.json'):
             # Backward compatibility fallback
             try:
                 creds = Credentials.from_authorized_user_file('token.json', SCOPES)
                 target_token_path = 'token.json'
             except Exception as e:
-                print(f"[!] Error reading fallback token.json: {e}")
+                logging.error(f"[!] Error reading fallback token.json: {e}")
 
     # 3. Refresh or authenticate via flow
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
+                logging.info("[*] Refreshing expired YouTube credentials...")
                 creds.refresh(Request())
+                logging.info("[+] YouTube credentials refreshed successfully!")
             except TransportError as te:
-                print(f"[!] Network connection error during token refresh: {te}")
+                logging.error(f"[!] Network connection error during token refresh: {te}")
                 raise te
             except Exception as e:
-                print(f"[!] Failed to refresh credentials: {e}. Falling back to InstalledAppFlow.")
+                logging.error(f"[!] Failed to refresh credentials: {e}. Falling back to InstalledAppFlow.")
                 creds = None
                 
         if not creds:
+            logging.error("[!] No valid credentials or refresh token available. Attempting InstalledAppFlow login.")
             flow = InstalledAppFlow.from_client_secrets_file(config.CLIENT_SECRETS_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
             
@@ -106,7 +110,7 @@ def upload_short(video_path, metadata, schedule_time=None, token_info=None, toke
     Uploads a short to YouTube via OAuth2.
     If schedule_time is provided, sets privacyStatus to 'private' and publishAt to future ISO 8601 UTC timestamp.
     """
-    print(f"[*] Uploading {video_path} to YouTube Shorts...")
+    logging.info(f"[*] Uploading {video_path} to YouTube Shorts...")
     youtube = get_authenticated_service(token_info=token_info, token_path=token_path)
 
     tags = [t.strip() for t in metadata['tags'].split(',')] if isinstance(metadata['tags'], str) else metadata['tags']
@@ -128,7 +132,7 @@ def upload_short(video_path, metadata, schedule_time=None, token_info=None, toke
         formatted_publish_time = schedule_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
         status_payload['privacyStatus'] = 'private'
         status_payload['publishAt'] = formatted_publish_time
-        print(f"[*] Scheduling YouTube Video Status Payload: {json.dumps(status_payload)}")
+        logging.info(f"[*] Scheduling YouTube Video Status Payload: {json.dumps(status_payload)}")
 
     body = {
         'snippet': {
@@ -152,8 +156,8 @@ def upload_short(video_path, metadata, schedule_time=None, token_info=None, toke
     while response is None:
         status, response = request.next_chunk()
         if status:
-            print(f"[-] Uploaded {int(status.progress() * 100)}%")
+            logging.info(f"[-] Uploaded {int(status.progress() * 100)}%")
 
-    print(f"[+] Upload Complete! Video ID: {response['id']} (Status: {status_payload['privacyStatus']})")
+    logging.info(f"[+] Upload Complete! Video ID: {response['id']} (Status: {status_payload['privacyStatus']})")
     log_upload(response['id'])
     return response['id']
