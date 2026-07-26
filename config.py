@@ -114,11 +114,37 @@ def setup_secret_files():
         with open(CLIENT_SECRETS_FILE, "w", encoding="utf-8") as f:
             f.write(client_secret_env)
 
+    # Resolve channels.json path to map uppercase env keys to exact case-sensitive channel names
+    channels_file = "channels.json"
+    import sys
+    if "--channels" in sys.argv:
+        try:
+            idx = sys.argv.index("--channels")
+            if idx + 1 < len(sys.argv):
+                channels_file = sys.argv[idx + 1]
+        except Exception:
+            pass
+
+    channel_name_map = {}
+    if os.path.exists(channels_file):
+        try:
+            import json
+            with open(channels_file, "r", encoding="utf-8") as f:
+                channels_data = json.load(f)
+                if isinstance(channels_data, list):
+                    for ch in channels_data:
+                        name = ch.get("channel_name")
+                        if name:
+                            channel_name_map[name.upper()] = name
+        except Exception as e:
+            print(f"[!] Error loading channels configuration in setup_secret_files: {e}")
+
     # Support channel-specific tokens from environment variables on GitHub Actions
     for key, value in os.environ.items():
         if key.startswith("YOUTUBE_TOKEN_JSON_"):
             channel_name = key[len("YOUTUBE_TOKEN_JSON_"):]
-            sanitized = "".join([c if c.isalnum() else "_" for c in channel_name])
+            actual_channel_name = channel_name_map.get(channel_name.upper(), channel_name)
+            sanitized = "".join([c if c.isalnum() else "_" for c in actual_channel_name])
             path = os.path.join(DATA_DIR, "channels", sanitized, "token.json")
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:

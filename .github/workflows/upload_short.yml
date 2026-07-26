@@ -49,7 +49,7 @@ jobs:
         run: |
           git config user.email "actions@github.com"
           git config user.name "github-actions[bot]"
-          git add data/channels/*/seen_videos.txt data/channels/*/upload_log.json
+          find data/channels -type f \( -name "seen_videos.txt" -o -name "upload_log.json" \) -exec git add {} +
           git commit -m "auto: update channel history files [skip ci]" || echo "No changes to commit"
           git fetch origin main
           git rebase -X ours origin/main || git rebase --abort || true
