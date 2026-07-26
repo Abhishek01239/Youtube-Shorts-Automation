@@ -1,5 +1,20 @@
 [
   {
+    "channel_name": "ExampleGamingChannel",
+    "niche": "Minecraft gaming highlights and funny moments",
+    "upload_schedule": {
+      "interval_hours": 3
+    },
+    "youtube_oauth_credentials": "data/channels/ExampleGamingChannel/token.json",
+    "source_configuration": {
+      "source_type": "twitch",
+      "target_games": [
+        "Minecraft"
+      ]
+    },
+    "shorts_per_run": 3
+  },
+  {
     "channel_name": "ExistingChannel",
     "niche": "gaming",
     "upload_schedule": {
@@ -15,20 +30,5 @@
       ]
     },
     "shorts_per_run": 6
-  },
-  {
-    "channel_name": "ExampleGamingChannel",
-    "niche": "Minecraft gaming highlights and funny moments",
-    "upload_schedule": {
-      "interval_hours": 3
-    },
-    "youtube_oauth_credentials": "data/channels/ExampleGamingChannel/token.json",
-    "source_configuration": {
-      "source_type": "twitch",
-      "target_games": [
-        "Minecraft"
-      ]
-    },
-    "shorts_per_run": 3
   }
 ]
