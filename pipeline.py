@@ -15,6 +15,8 @@ from highlight_detector import get_highlights
 from video_processor import process_video
 from metadata_generator import generate_metadata
 from youtube_uploader import upload_short, get_upload_count_today
+from notifier import notify_report
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -329,6 +331,13 @@ def run_multi_channel(channels_file="channels.json", default_count=6, default_ga
             
     print_report(report)
     save_report(report)
+    
+    # Send execution summary notification
+    try:
+        notify_report(report)
+    except Exception as e:
+        logging.error(f"[!] Failed to execute notification flow: {e}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-Channel YouTube Shorts Scheduled Automation Pipeline")

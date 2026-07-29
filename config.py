@@ -11,6 +11,16 @@ GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or "").strip()
 TWITCH_CLIENT_ID = (os.getenv("TWITCH_CLIENT_ID") or "").strip()
 TWITCH_CLIENT_SECRET = (os.getenv("TWITCH_CLIENT_SECRET") or "").strip()
 
+# Notification Configuration
+NOTIFICATION_PROVIDER = (os.getenv("NOTIFICATION_PROVIDER") or "TELEGRAM").upper().strip()
+TWILIO_ACCOUNT_SID = (os.getenv("TWILIO_ACCOUNT_SID") or "").strip()
+TWILIO_AUTH_TOKEN = (os.getenv("TWILIO_AUTH_TOKEN") or "").strip()
+TWILIO_FROM_NUMBER = (os.getenv("TWILIO_FROM_NUMBER") or "").strip()
+USER_PHONE_NUMBER = (os.getenv("USER_PHONE_NUMBER") or "").strip()
+TELEGRAM_BOT_TOKEN = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+TELEGRAM_CHAT_ID = (os.getenv("TELEGRAM_CHAT_ID") or "").strip()
+
+
 # Directory Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")

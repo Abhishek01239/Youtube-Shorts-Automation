@@ -42,6 +42,14 @@ jobs:
           # Channel dynamic tokens passed as environment variables:
           YOUTUBE_TOKEN_JSON_EXISTINGCHANNEL: ${{ secrets.YOUTUBE_TOKEN_JSON_EXISTINGCHANNEL }}
           YOUTUBE_TOKEN_JSON_EXAMPLEGAMINGCHANNEL: ${{ secrets.YOUTUBE_TOKEN_JSON_EXAMPLEGAMINGCHANNEL }}
+          # Notification Configuration Secrets
+          NOTIFICATION_PROVIDER: ${{ secrets.NOTIFICATION_PROVIDER }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_FROM_NUMBER: ${{ secrets.TWILIO_FROM_NUMBER }}
+          USER_PHONE_NUMBER: ${{ secrets.USER_PHONE_NUMBER }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python pipeline.py --channels channels.json
 
