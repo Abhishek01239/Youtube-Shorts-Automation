@@ -1,81 +1,60 @@
 import os
 import subprocess
-import librosa
-import numpy as np
-from scenedetect import detect, ContentDetector
 from config import get_ffmpeg_path
 
-def get_highlights(video_path, num_clips=5):
-    """
-    Uses scenedetect to segment the video and audio energy (librosa) 
-    to score segments, extracting the most exciting 15-59s moments.
-    """
-    print("[*] Detecting highlights...")
-    scenes = detect(video_path, ContentDetector())
-    
-    if not scenes:
-        # Fallback if no cuts detected
-        return [{"start": 10, "end": 45, "duration": 35}]
-
-    # Extract full audio to compute RMS energy
-    wav_path = video_path.rsplit('.', 1)[0] + "_full.wav"
-    ffmpeg_path = get_ffmpeg_path()
-    subprocess.run([
-        ffmpeg_path, "-y", "-i", video_path, 
-        "-ac", "1", "-ar", "16000", wav_path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
+def get_video_duration(video_path):
+    """Probes the video file using ffprobe to retrieve duration in seconds."""
     try:
-        y, sr_lib = librosa.load(wav_path, sr=16000)
-        rms = librosa.feature.rms(y=y)[0]
-        times = librosa.frames_to_time(np.arange(len(rms)), sr=sr_lib)
+        ffmpeg_path = get_ffmpeg_path()
+        # Resolve ffprobe path by replacing ffmpeg with ffprobe
+        if "ffmpeg.exe" in ffmpeg_path:
+            ffprobe_path = ffmpeg_path.replace("ffmpeg.exe", "ffprobe.exe")
+        elif "ffmpeg" in ffmpeg_path:
+            ffprobe_path = ffmpeg_path.replace("ffmpeg", "ffprobe")
+        else:
+            ffprobe_path = "ffprobe"
+            
+        cmd = [
+            ffprobe_path, "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", video_path
+        ]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        return float(result.stdout.strip())
     except Exception as e:
-        print(f"[!] Error loading audio for highlight detection: {e}")
-        if os.path.exists(wav_path):
-            try:
-                os.remove(wav_path)
-            except Exception:
-                pass
-        return []
+        print(f"[!] Error getting video duration: {e}")
+        return 0.0
 
-    scored_scenes = []
+def get_highlights(video_path, num_clips=1):
+    """
+    Bypasses complex audio energy and scene detection.
+    Always cuts a reliable segment from the video to guarantee successful processing.
+    """
+    print("[*] Detecting highlights (Simplified Cut logic)...")
+    duration = get_video_duration(video_path)
     
-    for scene in scenes:
-        start_time = scene[0].get_seconds()
-        end_time = scene[1].get_seconds()
-        duration = end_time - start_time
+    if duration <= 0:
+        # Default fallback if duration could not be determined
+        print("[!] Could not determine video duration. Using fallback range.")
+        return [{"start": 10.0, "end": 45.0, "duration": 35.0}]
         
-        if duration < 10:
-            continue
-            
-        clip_end = min(start_time + 59, end_time)
-        clip_dur = clip_end - start_time
-        
-        if clip_dur < 15:
-            continue
-            
-        start_idx = np.searchsorted(times, start_time)
-        end_idx = np.searchsorted(times, clip_end)
-        
-        if start_idx >= end_idx:
-            continue
-            
-        energy = np.mean(rms[start_idx:end_idx])
-        
-        scored_scenes.append({
-            "start": start_time,
-            "end": clip_end,
-            "duration": clip_dur,
-            "energy": energy
-        })
-        
-    if os.path.exists(wav_path):
-        try:
-            os.remove(wav_path)
-        except Exception:
-            pass
-        
-    # Sort by highest energy
-    scored_scenes.sort(key=lambda x: x["energy"], reverse=True)
+    print(f"[+] Video duration detected: {duration:.1f}s")
     
-    return scored_scenes[:num_clips]
+    # Target clip duration of 35 seconds (leads to a ~29.1s Short after 1.2x speedup)
+    target_clip_dur = 35.0
+    
+    if duration <= 45.0:
+        # For short clips (already under 45s), use the full clip
+        start_time = 0.0
+        end_time = duration
+        clip_dur = duration
+    else:
+        # For longer videos, cut a 35s segment from the middle
+        start_time = (duration - target_clip_dur) / 2.0
+        end_time = start_time + target_clip_dur
+        clip_dur = target_clip_dur
+        
+    return [{
+        "start": start_time,
+        "end": end_time,
+        "duration": clip_dur
+    }]

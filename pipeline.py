@@ -123,6 +123,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
     
     uploaded_count = 0
     uploads_info = []
+    upload_error = None
     
     for video in videos:
         if uploaded_count >= shorts_per_run:
@@ -219,19 +220,42 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 mark_youtube_seen(video['video_id'])
         except Exception as e:
             logging.error(f"[!] Upload failed for video {video['video_id']}: {e}")
+            upload_error = str(e)
             cleanup_disk()
-            break
+            
+            # Detect credentials, OAuth, or connection-related exceptions
+            err_str = str(e).lower()
+            is_auth_error = any(kw in err_str for kw in ["invalid_grant", "credentials", "token", "unauthorized", "auth"])
+            is_network_error = any(kw in err_str for kw in ["transport", "connection", "socket", "timeout"])
+            
+            if is_auth_error or is_network_error:
+                logging.error("[!] Authentication or network error detected. Aborting channel pipeline loop.")
+                break
+                
+            # For other transient or video-specific errors, mark seen and continue
+            if source_type == "twitch":
+                mark_twitch_seen(video['video_id'])
+            else:
+                mark_youtube_seen(video['video_id'])
+            continue
             
         cleanup_disk()
         
         time.sleep(5)
         
+    status = "Success"
+    if upload_error:
+        if uploaded_count > 0:
+            status = "Partial Success"
+        else:
+            status = "Failed"
+            
     return {
         "channel_name": channel_name,
         "shorts_created": uploaded_count,
         "uploads": uploads_info,
-        "status": "Success",
-        "error": None
+        "status": status,
+        "error": upload_error
     }
 
 def print_report(report):
