@@ -75,7 +75,7 @@ def get_game_id(game_name, headers):
 def find_twitch_clips(target_games=None):
     """
     Queries Twitch Helix API for top trending clips across target game categories.
-    Iterates through games until fresh unseen candidate clips are found.
+    Iterates through games and paginates through results until fresh unseen candidate clips are found.
     """
     token = get_twitch_access_token()
     if not token:
@@ -100,28 +100,40 @@ def find_twitch_clips(target_games=None):
         if not game_id:
             continue
 
-        url = f"https://api.twitch.tv/helix/clips?game_id={game_id}&first=50"
+        url = f"https://api.twitch.tv/helix/clips?game_id={game_id}&first=100"
+        cursor = None
+        
         try:
-            res = requests.get(url, headers=headers, timeout=10)
-            res.raise_for_status()
-            clips = res.json().get("data", [])
+            for page in range(3): # Paginate up to 3 pages (300 clips) to find unseen content
+                query_url = url
+                if cursor:
+                    query_url += f"&after={cursor}"
+                    
+                res = requests.get(query_url, headers=headers, timeout=10)
+                res.raise_for_status()
+                res_data = res.json()
+                clips = res_data.get("data", [])
 
-            for clip in clips:
-                clip_id = clip.get("id")
-                if not clip_id or clip_id in seen:
-                    continue
+                for clip in clips:
+                    clip_id = clip.get("id")
+                    if not clip_id or clip_id in seen:
+                        continue
 
-                candidates.append({
-                    "video_id": clip_id,
-                    "title": clip.get("title", f"{game_name} Twitch Clip"),
-                    "url": clip.get("url"),
-                    "thumbnail_url": clip.get("thumbnail_url"),
-                    "game_name": game_name,
-                    "duration": clip.get("duration", 30)
-                })
+                    candidates.append({
+                        "video_id": clip_id,
+                        "title": clip.get("title", f"{game_name} Twitch Clip"),
+                        "url": clip.get("url"),
+                        "thumbnail_url": clip.get("thumbnail_url"),
+                        "game_name": game_name,
+                        "duration": clip.get("duration", 30)
+                    })
+
+                cursor = res_data.get("pagination", {}).get("cursor")
+                if not cursor or len(clips) < 100:
+                    break
 
             if candidates:
-                logging.info(f"[+] Found {len(candidates)} unseen candidate clips in '{game_name}'")
+                logging.info(f"[+] Found {len(candidates)} unseen candidate clips in '{game_name}' after searching paginated results")
                 break
 
         except Exception as e:
