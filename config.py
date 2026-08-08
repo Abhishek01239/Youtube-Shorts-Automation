@@ -99,7 +99,9 @@ BGM_DIR = os.path.join(ASSETS_DIR, "background_music")
 FONTS_DIR = os.path.join(ASSETS_DIR, "fonts")
 
 # Limits & Requirements
-MAX_UPLOADS_PER_DAY = 15
+# 6 Shorts + 3 long-form videos per channel per day (2 channels = 18 max),
+# plus headroom for manual/dispatch runs.
+MAX_UPLOADS_PER_DAY = 24
 
 # Target Gaming Categories (Strictly GTA 5, GTA 6, Indian Bike Driving 3D, and Call of Duty ONLY)
 TARGET_GAMES = [

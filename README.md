@@ -12,6 +12,7 @@ An automated production pipeline that fetches trending gaming clips from the **T
 - **Shorts Video Processor**: Crops, scales, sharpens, and speeds up 16:9 gameplay into pristine 9:16 vertical 1080p video (< 45 seconds).
 - **Groq Llama 3.3 Metadata**: Generates viral titles, SEO descriptions, and tags.
 - **YouTube OAuth2 Uploader**: Automatically uploads Shorts to YouTube with `#shorts` tags.
+- **Long-form Compilation Videos**: Also builds regular 16:9 1080p videos (several clips stitched with BGM) and schedules them as standard YouTube uploads (no `#shorts`).
 - **GitHub Actions 24/7 Scheduler**: Automatically runs 6 times daily (`0 6,9,12,15,18,21 * * *` UTC).
 
 ---
@@ -61,6 +62,24 @@ YOUTUBE_CLIENT_SECRET_JSON='{"installed": {"client_id": "..."}}'
    ```bash
    python pipeline.py --loop
    ```
+
+```json
+{
+  "channel_name": "MyChannel",
+  "niche": "Minecraft gaming highlights and funny moments",
+  "upload_schedule": { "interval_hours": 3 },
+  "shorts_per_run": 6,
+  "videos_per_run": 3,
+  "clips_per_video": 5,
+  "youtube_oauth_credentials": "data/channels/MyChannel/token.json",
+  "source_configuration": {
+    "source_type": "twitch",
+    "target_games": ["Minecraft"]
+  }
+}
+```
+- `shorts_per_run` → how many Shorts to create per batch (default 6).
+- `videos_per_run` → how many long-form compilation videos to create per batch (default 0 = disabled; each video stitches `clips_per_video` clips, default 5).
 
 ---
 

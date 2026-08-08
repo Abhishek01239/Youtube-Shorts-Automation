@@ -58,3 +58,23 @@ def get_highlights(video_path, num_clips=1):
         "end": end_time,
         "duration": clip_dur
     }]
+
+
+def get_full_clip_range(video_path, max_duration=60.0):
+    """
+    Returns a start/end range covering the WHOLE clip for long-form compilation
+    videos. Twitch clips are short (typically < 60s) so the entire clip is used;
+    unexpectedly long sources get a middle cut instead.
+    """
+    duration = get_video_duration(video_path)
+
+    if duration <= 0:
+        # Default fallback if duration could not be determined
+        print("[!] Could not determine video duration. Using fallback range.")
+        return {"start": 0.0, "end": 45.0, "duration": 45.0}
+
+    if duration <= max_duration:
+        return {"start": 0.0, "end": duration, "duration": duration}
+
+    start_time = (duration - max_duration) / 2.0
+    return {"start": start_time, "end": start_time + max_duration, "duration": max_duration}

@@ -105,22 +105,28 @@ def log_upload(video_id):
     with open(log_file, 'w', encoding='utf-8') as f:
         json.dump(logs, f, indent=4)
 
-def upload_short(video_path, metadata, schedule_time=None, token_info=None, token_path=None):
+def _upload(video_path, metadata, schedule_time=None, token_info=None, token_path=None, is_short=True):
     """
-    Uploads a short to YouTube via OAuth2.
+    Uploads a video to YouTube via OAuth2.
     If schedule_time is provided, sets privacyStatus to 'private' and publishAt to future ISO 8601 UTC timestamp.
+    is_short=True appends #shorts to the title/description (Shorts uploads);
+    is_short=False uploads a regular long-form video without #shorts.
     """
-    logging.info(f"[*] Uploading {video_path} to YouTube Shorts...")
+    content_kind = "Short" if is_short else "video"
+    logging.info(f"[*] Uploading {video_path} to YouTube {content_kind}...")
     youtube = get_authenticated_service(token_info=token_info, token_path=token_path)
 
     tags = [t.strip() for t in metadata['tags'].split(',')] if isinstance(metadata['tags'], str) else metadata['tags']
     description = metadata['description'] + "\n\n" + " ".join(metadata['hashtags'])
-    if "#shorts" not in description.lower():
+    if is_short and "#shorts" not in description.lower():
         description += " #shorts"
 
     title = metadata['title']
-    if "#shorts" not in title.lower():
-        title = f"{title[:75]} #shorts"
+    if is_short:
+        if "#shorts" not in title.lower():
+            title = f"{title[:75]} #shorts"
+    else:
+        title = title[:100]
 
     status_payload = {
         'privacyStatus': 'public',
@@ -161,3 +167,28 @@ def upload_short(video_path, metadata, schedule_time=None, token_info=None, toke
     logging.info(f"[+] Upload Complete! Video ID: {response['id']} (Status: {status_payload['privacyStatus']})")
     log_upload(response['id'])
     return response['id']
+
+
+def upload_short(video_path, metadata, schedule_time=None, token_info=None, token_path=None):
+    """
+    Uploads a short to YouTube via OAuth2 (adds #shorts to title/description).
+    If schedule_time is provided, sets privacyStatus to 'private' and publishAt to future ISO 8601 UTC timestamp.
+    """
+    return _upload(
+        video_path, metadata,
+        schedule_time=schedule_time, token_info=token_info, token_path=token_path,
+        is_short=True
+    )
+
+
+def upload_video(video_path, metadata, schedule_time=None, token_info=None, token_path=None):
+    """
+    Uploads a regular (long-form, non-short) video to YouTube via OAuth2.
+    No '#shorts' is appended to the title/description.
+    If schedule_time is provided, sets privacyStatus to 'private' and publishAt to future ISO 8601 UTC timestamp.
+    """
+    return _upload(
+        video_path, metadata,
+        schedule_time=schedule_time, token_info=token_info, token_path=token_path,
+        is_short=False
+    )

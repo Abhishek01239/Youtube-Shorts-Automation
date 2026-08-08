@@ -5,6 +5,7 @@
     "upload_schedule": {
       "interval_hours": 3
     },
+    "videos_per_run": 3,
     "youtube_oauth_credentials": "data/channels/ExampleGamingChannel/token.json",
     "source_configuration": {
       "source_type": "twitch",
@@ -20,6 +21,7 @@
     "upload_schedule": {
       "interval_hours": 2
     },
+    "videos_per_run": 3,
     "youtube_oauth_credentials": "data/channels/ExistingChannel/token.json",
     "source_configuration": {
       "source_type": "twitch",

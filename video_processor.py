@@ -109,3 +109,137 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
             print(str(e))
         print("==================================\n")
         return None
+
+
+def process_compilation_video(clip_segments, output_filename, max_duration=600):
+    """
+    Builds a long-form YouTube video (16:9 1080p) by stitching several clip
+    segments together into a single file. Each segment receives the same color /
+    denoise / sharpen grade as the Shorts processor, original audio is preserved,
+    and BGM is laid underneath at low volume. Output is capped at max_duration
+    seconds (default 10 min, safe under YouTube's long-form limit).
+
+    clip_segments: list of (video_path, start, end) tuples.
+    Returns absolute path to the final MP4 or None on failure.
+    """
+    processed_dir = config.get_processed_dir()
+    os.makedirs(processed_dir, exist_ok=True)
+
+    ffmpeg_cmd = config.get_ffmpeg_path()
+    base = os.path.splitext(output_filename)[0]
+    part_paths = []
+    list_path = os.path.join(processed_dir, f"{base}_concat.txt")
+    merged_path = os.path.join(processed_dir, f"{base}_merged.mp4")
+    out_path = os.path.join(processed_dir, output_filename)
+
+    try:
+        # Step A: grade & normalize each segment into uniform 16:9 1080p parts
+        for i, (video_path, start, end) in enumerate(clip_segments):
+            dur = min(max(end - start, 5.0), 90.0)
+            part_path = os.path.join(processed_dir, f"{base}_part{i}.mp4")
+
+            stream = ffmpeg.input(video_path, ss=start, t=dur)
+            v = (
+                stream.video
+                .filter("scale", 1920, 1080, force_original_aspect_ratio="decrease")
+                .filter("pad", 1920, 1080, "(ow-iw)/2", "(oh-ih)/2")
+                .filter("hqdn3d", 1.0, 1.0, 3.0, 3.0)
+                .filter("colorbalance", rs=0.18, gs=0.18, bs=0.18)
+                .filter("curves", m="0/0 0.25/0.20 0.5/0.55 0.75/0.83 1/1")
+                .filter("unsharp", 5, 5, 1.2, 5, 5, 0.0)
+            )
+
+            # Try with original audio (normalized params so concat can stream-copy)
+            has_audio = False
+            try:
+                a = stream.audio.filter(
+                    "aformat",
+                    sample_fmts="fltp", sample_rates=44100, channel_layouts="stereo"
+                )
+                has_audio = True
+            except (AttributeError, ffmpeg.Error):
+                pass
+
+            if has_audio:
+                try:
+                    part = ffmpeg.output(
+                        v, a, part_path,
+                        vcodec="libx264", acodec="aac", preset="fast", crf=18,
+                        pix_fmt="yuv420p", movflags="+faststart",
+                        strict="experimental", loglevel="error", threads=0
+                    )
+                    part.run(overwrite_output=True, cmd=ffmpeg_cmd)
+                except ffmpeg.Error:
+                    has_audio = False
+
+            if not has_audio:
+                part = ffmpeg.output(
+                    v, part_path,
+                    vcodec="libx264", preset="fast", crf=18,
+                    pix_fmt="yuv420p", movflags="+faststart",
+                    loglevel="error", threads=0
+                )
+                part.run(overwrite_output=True, cmd=ffmpeg_cmd)
+
+            part_paths.append(part_path)
+
+        if len(part_paths) < 1:
+            return None
+
+        # Step B: concatenate parts (identical encoding params -> stream copy)
+        with open(list_path, "w", encoding="utf-8") as f:
+            for p in part_paths:
+                escaped = p.replace("\\", "/").replace("'", "'\\''")
+                f.write(f"file '{escaped}'\n")
+
+        concat_in = ffmpeg.input(list_path, f="concat", safe=0)
+        try:
+            concat_in.output(merged_path, c="copy", loglevel="error").run(
+                overwrite_output=True, cmd=ffmpeg_cmd
+            )
+        except ffmpeg.Error:
+            concat_in.output(
+                merged_path, vcodec="libx264", acodec="aac", preset="fast", crf=18,
+                pix_fmt="yuv420p", loglevel="error", threads=0
+            ).run(overwrite_output=True, cmd=ffmpeg_cmd)
+
+        # Step C: lay BGM underneath the original audio
+        bgm_path = get_random_bgm()
+        if bgm_path:
+            merged = ffmpeg.input(merged_path)
+            bgm = (
+                ffmpeg.input(bgm_path).audio
+                .filter("atrim", duration=max_duration)
+                .filter("volume", 0.15)
+            )
+            mixed = ffmpeg.filter([merged.audio, bgm], "amix", inputs=2, duration="first")
+            ffmpeg.output(
+                merged.video, mixed, out_path,
+                vcodec="copy", acodec="aac", preset="fast", t=max_duration,
+                movflags="+faststart", loglevel="error", threads=0
+            ).run(overwrite_output=True, cmd=ffmpeg_cmd)
+        else:
+            os.replace(merged_path, out_path)
+
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 100000:
+            print(f"[+] Long-form video saved: {out_path}")
+            return out_path
+        return None
+
+    except ffmpeg.Error as e:
+        print("\n========== FFMPEG ERROR (compilation) ==========")
+        if e.stderr:
+            print(e.stderr.decode())
+        else:
+            print(str(e))
+        print("===============================================\n")
+        return None
+
+    finally:
+        # Always clean up intermediates (raw/processed dirs are wiped later too)
+        for p in part_paths + [list_path, merged_path]:
+            try:
+                if os.path.exists(p):
+                    os.unlink(p)
+            except Exception:
+                pass

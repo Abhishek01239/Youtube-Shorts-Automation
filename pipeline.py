@@ -11,10 +11,10 @@ from twitch_downloader import download_twitch_clip
 from video_finder import find_videos, find_playlist_videos, mark_video_seen as mark_youtube_seen
 from downloader import download_video
 from audio_analyzer import analyze_audio
-from highlight_detector import get_highlights
-from video_processor import process_video
-from metadata_generator import generate_metadata
-from youtube_uploader import upload_short, get_upload_count_today
+from highlight_detector import get_highlights, get_full_clip_range
+from video_processor import process_video, process_compilation_video
+from metadata_generator import generate_metadata, generate_video_metadata
+from youtube_uploader import upload_short, upload_video, get_upload_count_today
 from notifier import notify_report
 
 
@@ -84,6 +84,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         return {
             "channel_name": channel_name,
             "shorts_created": 0,
+            "videos_created": 0,
             "uploads": [],
             "status": "Skipped (Quota reached)",
             "error": None
@@ -115,6 +116,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         return {
             "channel_name": channel_name,
             "shorts_created": 0,
+            "videos_created": 0,
             "uploads": [],
             "status": "No candidate videos",
             "error": None
@@ -126,6 +128,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
     uploaded_count = 0
     uploads_info = []
     upload_error = None
+    abort_pipeline = False
     
     for video in videos:
         if uploaded_count >= shorts_per_run:
@@ -232,6 +235,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             
             if is_auth_error or is_network_error:
                 logging.error("[!] Authentication or network error detected. Aborting channel pipeline loop.")
+                abort_pipeline = True
                 break
                 
             # For other transient or video-specific errors, mark seen and continue
@@ -245,6 +249,109 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         
         time.sleep(5)
         
+    # ======================================================
+    # Long-form Video Phase: N compilation videos per run
+    # (same Twitch source; each video = several clips stitched
+    #  into one 16:9 1080p upload, scheduled like the shorts)
+    # ======================================================
+    videos_per_run = channel.get("videos_per_run", 0)
+    clips_per_video = channel.get("clips_per_video", 5)
+    videos_created = 0
+
+    if videos_per_run > 0 and not abort_pipeline:
+        logging.info(f"[*] Video phase: targeting {videos_per_run} long-form video(s) ({clips_per_video} clips each) for '{channel_name}'")
+        
+        if get_upload_count_today() >= config.MAX_UPLOADS_PER_DAY:
+            logging.info("[!] Daily quota limit reached. Skipping video phase.")
+        else:
+            video_candidates = find_twitch_clips(target_games=target_games)
+            cursor = 0
+
+            for vidx in range(videos_per_run):
+                if get_upload_count_today() >= config.MAX_UPLOADS_PER_DAY:
+                    logging.info("[!] Daily quota limit reached during video phase. Stopping video creation.")
+                    break
+
+                segments = []
+                used_clips = []
+                while len(segments) < clips_per_video and cursor < len(video_candidates):
+                    clip = video_candidates[cursor]
+                    cursor += 1
+                    clip_id = clip["video_id"]
+
+                    # Skip unreasonably short clips before wasting a download
+                    if clip.get("duration", 30) < 8:
+                        mark_twitch_seen(clip_id)
+                        continue
+
+                    clip_path = download_twitch_clip(clip)
+                    if not clip_path or not os.path.exists(clip_path):
+                        mark_twitch_seen(clip_id)
+                        continue
+
+                    seg_range = get_full_clip_range(clip_path)
+                    if seg_range["duration"] < 8:
+                        mark_twitch_seen(clip_id)
+                        continue
+
+                    segments.append((clip_path, seg_range["start"], seg_range["end"]))
+                    used_clips.append(clip)
+
+                if len(segments) < 2:
+                    logging.info("[-] Not enough clips available for another compilation video. Stopping video phase.")
+                    break
+
+                logging.info(f"\n>>> Building Long-form Video [{vidx + 1}/{videos_per_run}] from {len(segments)} clips for {channel_name}")
+                out_filename = f"video_{datetime.now().strftime('%H%M%S')}_{vidx + 1}.mp4"
+                processed_path = process_compilation_video(segments, out_filename)
+
+                if not processed_path or not os.path.exists(processed_path):
+                    logging.error("[!] Compilation video processing failed.")
+                    for c in used_clips:
+                        mark_twitch_seen(c["video_id"])
+                    cleanup_disk()
+                    continue
+
+                metadata = generate_video_metadata(used_clips[0]["title"], niche=niche)
+                scheduled_time = base_publish_time + timedelta(hours=(uploaded_count + videos_created) * interval_hours)
+
+                try:
+                    uploaded_video_id = upload_video(
+                        processed_path,
+                        metadata,
+                        schedule_time=scheduled_time,
+                        token_info=token_info,
+                        token_path=token_path
+                    )
+                    videos_created += 1
+                    logging.info(f"[+] ({vidx + 1}/{videos_per_run}) Successfully uploaded & scheduled compilation video for release at {scheduled_time.strftime('%H:%M')} UTC!")
+                    uploads_info.append({
+                        "video_id": uploaded_video_id,
+                        "title": metadata['title'],
+                        "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z'),
+                        "type": "video"
+                    })
+                    for c in used_clips:
+                        mark_twitch_seen(c["video_id"])
+                except Exception as e:
+                    logging.error(f"[!] Video upload failed for compilation {out_filename}: {e}")
+                    if not upload_error:
+                        upload_error = str(e)
+                    for c in used_clips:
+                        mark_twitch_seen(c["video_id"])
+
+                    # Detect credentials, OAuth, or connection-related exceptions
+                    err_str = str(e).lower()
+                    is_auth_error = any(kw in err_str for kw in ["invalid_grant", "credentials", "token", "unauthorized", "auth"])
+                    is_network_error = any(kw in err_str for kw in ["transport", "connection", "socket", "timeout"])
+
+                    if is_auth_error or is_network_error:
+                        logging.error("[!] Authentication or network error detected during video phase. Aborting video phase.")
+                        break
+
+                cleanup_disk()
+                time.sleep(5)
+
     status = "Success"
     if upload_error:
         if uploaded_count > 0:
@@ -255,6 +362,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
     return {
         "channel_name": channel_name,
         "shorts_created": uploaded_count,
+        "videos_created": videos_created,
         "uploads": uploads_info,
         "status": status,
         "error": upload_error
@@ -268,10 +376,11 @@ def print_report(report):
         print(f"Channel Name:   {r['channel_name']}")
         print(f"Status:         {r['status']}")
         print(f"Shorts Created: {r['shorts_created']}")
+        print(f"Videos Created: {r.get('videos_created', 0)}")
         if r['uploads']:
             print("Scheduled Uploads:")
             for u in r['uploads']:
-                print(f"  - [{u['video_id']}] {u['title']} (Publish: {u['publish_time']})")
+                print(f"  - [{u['video_id']}] ({u.get('type', 'short')}) {u['title']} (Publish: {u['publish_time']})")
         if r['error']:
             print(f"Error:          {r['error']}")
         print("-" * 60)

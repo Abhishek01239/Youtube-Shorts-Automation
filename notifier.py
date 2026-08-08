@@ -11,6 +11,7 @@ def format_report_message(report):
         status_emoji = "✅" if r['status'] == "Success" else "⚠️" if r['status'] == "Partial Success" else "❌" if r['status'] == "Failed" else "⏭️"
         msg_lines.append(f"{status_emoji} {r['channel_name']}: {r['status']}")
         msg_lines.append(f"   Shorts Created: {r['shorts_created']}")
+        msg_lines.append(f"   Videos Created: {r.get('videos_created', 0)}")
         if r['error']:
             msg_lines.append(f"   Error: {r['error'][:80]}")
         msg_lines.append("-"*30)
