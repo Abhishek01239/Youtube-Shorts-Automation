@@ -3,7 +3,7 @@
     "channel_name": "ExampleGamingChannel",
     "niche": "Minecraft gaming highlights and funny moments",
     "upload_schedule": {
-      "interval_hours": 3
+      "interval_hours": 1.2
     },
     "videos_per_run": 3,
     "youtube_oauth_credentials": "data/channels/ExampleGamingChannel/token.json",
@@ -13,7 +13,7 @@
         "Minecraft"
       ]
     },
-    "shorts_per_run": 6
+    "shorts_per_run": 18
   },
   {
     "channel_name": "ExistingChannel",
