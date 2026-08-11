@@ -6,7 +6,7 @@ __pycache__/
 # Credentials & environment variables (Do NOT commit sensitive tokens!)
 .env
 **/token.json
-client_secret.json
+**/client_secret.json
 cookies.txt
 oauth_state.json
 

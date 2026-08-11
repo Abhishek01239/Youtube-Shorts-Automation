@@ -31,14 +31,24 @@ SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("Usage:")[0])
     parser.add_argument("channel", help="exact channel_name from channels.json (e.g. GAMES)")
+    parser.add_argument("--client-secret", help="optional path to a specific client_secret.json "
+                        "(default: data/channels/<CHANNEL>/client_secret.json, then client_secret.json)")
     args = parser.parse_args()
 
     sanitized = "".join([c if c.isalnum() else "_" for c in args.channel])
     token_path = os.path.join(BASE_DIR, "data", "channels", sanitized, "token.json")
-    client_secret_path = os.path.join(BASE_DIR, "client_secret.json")
 
-    if not os.path.exists(client_secret_path):
-        sys.exit(f"[!] Missing {client_secret_path}. Put your client_secret.json in the repo root first.")
+    # Prefer a channel-specific client secret, fall back to the shared root one.
+    candidates = [
+        args.client_secret,
+        os.path.join(BASE_DIR, "data", "channels", sanitized, "client_secret.json"),
+        os.path.join(BASE_DIR, "client_secret.json"),
+    ]
+    client_secret_path = next((c for c in candidates if c and os.path.exists(c)), None)
+
+    if not client_secret_path:
+        sys.exit(f"[!] No client_secret.json found. Put it in the repo root, in "
+                 f"data/channels/{sanitized}/client_secret.json, or pass --client-secret.")
 
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
