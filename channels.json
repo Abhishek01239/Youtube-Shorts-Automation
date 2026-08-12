@@ -21,6 +21,7 @@
     "upload_schedule": {
       "interval_hours": 2
     },
+    "paused_until": "2026-09-01",
     "videos_per_run": 3,
     "youtube_oauth_credentials": "data/channels/ExistingChannel/token.json",
     "source_configuration": {

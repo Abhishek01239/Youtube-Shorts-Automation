@@ -40,6 +40,29 @@ def cleanup_disk():
 def run_channel_pipeline(channel, default_count=6, default_gap=2):
     channel_name = channel["channel_name"]
     niche = channel.get("niche", "gaming")
+
+    # Pause gate: if "paused_until": "YYYY-MM-DD" is set and today < that date,
+    # skip this channel entirely (no sourcing, no uploads). Resumes automatically
+    # on the date.
+    paused_until = channel.get("paused_until")
+    if paused_until:
+        try:
+            pause_date = datetime.strptime(paused_until, "%Y-%m-%d").date()
+            if datetime.now(timezone.utc).date() < pause_date:
+                logging.info(f"[!] Channel '{channel_name}' is paused until {paused_until}. Skipping.")
+                return {
+                    "channel_name": channel_name,
+                    "shorts_created": 0,
+                    "videos_created": 0,
+                    "uploads": [],
+                    "status": f"Paused until {paused_until}",
+                    "error": None,
+                }
+            else:
+                logging.info(f"[*] Channel '{channel_name}': pause window ({paused_until}) over — resuming.")
+        except ValueError:
+            logging.warning(f"[!] Invalid paused_until for '{channel_name}': {paused_until!r} (expected YYYY-MM-DD). Ignoring.")
+
     shorts_per_run = channel.get("shorts_per_run", default_count)
     
     # Resolve schedule
