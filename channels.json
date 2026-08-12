@@ -27,9 +27,7 @@
     "source_configuration": {
       "source_type": "twitch",
       "target_games": [
-        "Grand Theft Auto V",
-        "Indian Bike Driving 3D",
-        "Call of Duty: Warzone"
+        "Minecraft"
       ]
     },
     "shorts_per_run": 6
