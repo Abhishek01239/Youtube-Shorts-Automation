@@ -5,18 +5,13 @@ on:
     # Trigger ONCE daily at 00:30 UTC (06:00 AM IST)
     - cron: '30 0 * * *'
   workflow_dispatch:
-    inputs:
-      channel:
-        description: "Run a single channel only (optional). Leave empty to run all channels in parallel."
-        required: false
-        default: ""
 
 permissions:
   contents: write
 
 jobs:
   run-automation:
-    # Run all 4 channels in parallel; or a single channel if dispatched manually.
+    # Run all 4 channels in parallel; each gets its own 6h job limit so none is starved.
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -26,9 +21,7 @@ jobs:
           - ExistingChannel
           - GAMES
           - MinecraftShorts
-    # Allow manual single-channel runs to override the matrix
-    name: ${{ github.event.inputs.channel != '' && github.event.inputs.channel || matrix.channel }}
-    if: ${{ github.event.inputs.channel == '' || github.event.inputs.channel == matrix.channel }}
+    name: ${{ matrix.channel }}
     runs-on: ubuntu-latest
     timeout-minutes: 350
 
