@@ -5,13 +5,32 @@ on:
     # Trigger ONCE daily at 00:30 UTC (06:00 AM IST)
     - cron: '30 0 * * *'
   workflow_dispatch:
+    inputs:
+      channel:
+        description: "Run a single channel only (optional). Leave empty to run all channels in parallel."
+        required: false
+        default: ""
 
 permissions:
   contents: write
 
 jobs:
   run-automation:
+    # Run all 4 channels in parallel; or a single channel if dispatched manually.
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        channel:
+          - ExampleGamingChannel
+          - ExistingChannel
+          - GAMES
+          - MinecraftShorts
+    # Allow manual single-channel runs to override the matrix
+    name: ${{ github.event.inputs.channel != '' && github.event.inputs.channel || matrix.channel }}
+    if: ${{ github.event.inputs.channel == '' || github.event.inputs.channel == matrix.channel }}
     runs-on: ubuntu-latest
+    timeout-minutes: 350
 
     steps:
       - name: Checkout Repository
@@ -32,7 +51,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Execute Daily Batch Shorts Generation (6 Shorts Created & Scheduled 2h Apart)
+      - name: Execute Shorts + Video Generation for ${{ matrix.channel }}
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
@@ -53,14 +72,26 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python pipeline.py --channels channels.json
+          python pipeline.py --channels channels.json --channel "${{ matrix.channel }}"
 
-      - name: Commit & Push Updated History
+      - name: Commit & Push Updated History (best-effort, retry on conflict)
+        if: always()
         run: |
           git config user.email "actions@github.com"
           git config user.name "github-actions[bot]"
-          find data/channels -type f \( -name "seen_videos.txt" -o -name "upload_log.json" \) -exec git add {} +
-          git commit -m "auto: update channel history files [skip ci]" || echo "No changes to commit"
-          git fetch origin main
-          git rebase -X ours origin/main || git rebase --abort || true
-          git push origin main || true
+          for i in 1 2 3 4 5; do
+            find data/channels -type f \( -name "seen_videos.txt" -o -name "upload_log.json" \) -exec git add {} +
+            if git diff --cached --quiet; then
+              echo "No history changes for ${{ matrix.channel }}"
+              break
+            fi
+            git commit -m "auto: update ${{ matrix.channel }} history [skip ci]" || break
+            git fetch origin main
+            git rebase -X ours origin/main || git rebase --abort || true
+            if git push origin main; then
+              echo "Pushed ${{ matrix.channel }} history"
+              break
+            fi
+            echo "Push conflict, retrying ($i)..."
+            sleep 5
+          done

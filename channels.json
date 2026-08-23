@@ -37,7 +37,7 @@
     "upload_schedule": {
       "interval_hours": 1.2
     },
-    "videos_per_run": 0,
+    "videos_per_run": 3,
     "youtube_oauth_credentials": "data/channels/GAMES/token.json",
     "source_configuration": {
       "source_type": "twitch",
@@ -53,7 +53,7 @@
     "upload_schedule": {
       "interval_hours": 1.6
     },
-    "videos_per_run": 0,
+    "videos_per_run": 3,
     "youtube_oauth_credentials": "data/channels/MinecraftShorts/token.json",
     "source_configuration": {
       "source_type": "twitch",

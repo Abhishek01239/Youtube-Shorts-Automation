@@ -426,7 +426,7 @@ def save_report(report):
             
     logging.info(f"[+] Run report saved to {latest_report_file}")
 
-def run_multi_channel(channels_file="channels.json", default_count=6, default_gap=2):
+def run_multi_channel(channels_file="channels.json", default_count=6, default_gap=2, channel_filter=None):
     if not os.path.exists(channels_file):
         logging.error(f"Channels configuration file '{channels_file}' does not exist.")
         sys.exit(1)
@@ -441,6 +441,13 @@ def run_multi_channel(channels_file="channels.json", default_count=6, default_ga
     if not isinstance(channels, list):
         logging.error("Channels configuration must be a JSON array of channel objects.")
         sys.exit(1)
+
+    # Optional single-channel filter (used by parallel matrix jobs)
+    if channel_filter:
+        channels = [c for c in channels if c.get("channel_name") == channel_filter]
+        if not channels:
+            logging.error(f"Channel '{channel_filter}' not found in configuration.")
+            sys.exit(1)
         
     logging.info(f"[*] Loaded {len(channels)} channel configurations from '{channels_file}'.")
     
@@ -477,15 +484,16 @@ if __name__ == "__main__":
     parser.add_argument("--count", type=int, default=6, help="Default number of Shorts to generate and schedule in one daily batch run (default: 6)")
     parser.add_argument("--gap", type=int, default=2, help="Default minimum gap in hours between scheduled video releases (default: 2)")
     parser.add_argument("--loop", action="store_true", help="Run continuously in 24/7 loop mode instead of single trigger mode")
+    parser.add_argument("--channel", type=str, default=None, help="Run only this single channel (used by parallel matrix jobs)")
     args = parser.parse_args()
 
     print("[Bot] Multi-Channel YouTube Shorts Scheduled Automation Bot Initiated [Bot]")
-    
+
     if args.loop:
         logging.info("[*] Running in continuous loop mode...")
         while True:
             try:
-                run_multi_channel(channels_file=args.channels, default_count=args.count, default_gap=args.gap)
+                run_multi_channel(channels_file=args.channels, default_count=args.count, default_gap=args.gap, channel_filter=args.channel)
                 logging.info("[*] Sleeping 24 hours until next daily batch cycle...")
                 time.sleep(86400)
             except Exception as e:
@@ -493,5 +501,5 @@ if __name__ == "__main__":
                 time.sleep(300)
     else:
         logging.info(f"[*] Running multi-channel scheduled batch mode...")
-        run_multi_channel(channels_file=args.channels, default_count=args.count, default_gap=args.gap)
+        run_multi_channel(channels_file=args.channels, default_count=args.count, default_gap=args.gap, channel_filter=args.channel)
         sys.exit(0)
