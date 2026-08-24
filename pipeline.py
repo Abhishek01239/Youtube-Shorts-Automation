@@ -230,34 +230,38 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         # 6. Calculate Scheduled Publish Time
         scheduled_time = base_publish_time + timedelta(hours=uploaded_count * interval_hours)
         
-        # 7. Upload & Schedule Short on YouTube
+        # 7. Upload & Schedule the Short (YouTube OR Facebook, based on platform)
         try:
-            uploaded_video_id = upload_short(
-                processed_path, 
-                metadata, 
-                schedule_time=scheduled_time,
-                token_info=token_info,
-                token_path=token_path
-            )
-            uploaded_count += 1
-            logging.info(f"[+] ({uploaded_count}/{shorts_per_run}) Successfully uploaded & scheduled clip {video['video_id']} for release at {scheduled_time.strftime('%H:%M')} UTC!")
-            uploads_info.append({
-                "video_id": uploaded_video_id,
-                "title": metadata['title'],
-                "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
-            })
-
-            # --- Facebook parallel upload (best-effort, never aborts YT flow) ---
             if platform == "facebook":
-                try:
-                    fb_id = upload_fb_video(
-                        processed_path, metadata,
-                        schedule_time=scheduled_time,
-                        channel=channel, is_short=True
-                    )
-                    logging.info(f"[+] Facebook short/reel published (post id {fb_id}) for YT channel '{channel_name}'")
-                except Exception as fb_e:
-                    logging.error(f"[!] Facebook short upload failed (non-fatal): {fb_e}")
+                # Facebook-only channel: upload to the FB Page, never YouTube.
+                fb_id = upload_fb_video(
+                    processed_path, metadata,
+                    schedule_time=scheduled_time,
+                    channel=channel, is_short=True
+                )
+                uploaded_video_id = fb_id
+                uploaded_count += 1
+                logging.info(f"[+] ({uploaded_count}/{shorts_per_run}) Published short/reel for clip {video['video_id']} to Facebook Page (post id {fb_id})!")
+                uploads_info.append({
+                    "video_id": uploaded_video_id,
+                    "title": metadata['title'],
+                    "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+                })
+            else:
+                uploaded_video_id = upload_short(
+                    processed_path,
+                    metadata,
+                    schedule_time=scheduled_time,
+                    token_info=token_info,
+                    token_path=token_path
+                )
+                uploaded_count += 1
+                logging.info(f"[+] ({uploaded_count}/{shorts_per_run}) Successfully uploaded & scheduled clip {video['video_id']} for release at {scheduled_time.strftime('%H:%M')} UTC!")
+                uploads_info.append({
+                    "video_id": uploaded_video_id,
+                    "title": metadata['title'],
+                    "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+                })
             if source_type == "twitch":
                 mark_twitch_seen(video['video_id'])
             else:
@@ -355,33 +359,38 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 scheduled_time = base_publish_time + timedelta(hours=(uploaded_count + videos_created) * interval_hours)
 
                 try:
-                    uploaded_video_id = upload_video(
-                        processed_path,
-                        metadata,
-                        schedule_time=scheduled_time,
-                        token_info=token_info,
-                        token_path=token_path
-                    )
-                    videos_created += 1
-                    logging.info(f"[+] ({vidx + 1}/{videos_per_run}) Successfully uploaded & scheduled compilation video for release at {scheduled_time.strftime('%H:%M')} UTC!")
-                    uploads_info.append({
-                        "video_id": uploaded_video_id,
-                        "title": metadata['title'],
-                        "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z'),
-                        "type": "video"
-                    })
-
-                    # --- Facebook parallel upload (best-effort, never aborts YT flow) ---
                     if platform == "facebook":
-                        try:
-                            fb_id = upload_fb_video(
-                                processed_path, metadata,
-                                schedule_time=scheduled_time,
-                                channel=channel, is_short=False
-                            )
-                            logging.info(f"[+] Facebook video scheduled (post id {fb_id}) for YT channel '{channel_name}'")
-                        except Exception as fb_e:
-                            logging.error(f"[!] Facebook video upload failed (non-fatal): {fb_e}")
+                        # Facebook-only channel: upload compilation to FB Page.
+                        fb_id = upload_fb_video(
+                            processed_path, metadata,
+                            schedule_time=scheduled_time,
+                            channel=channel, is_short=False
+                        )
+                        uploaded_video_id = fb_id
+                        videos_created += 1
+                        logging.info(f"[+] ({vidx + 1}/{videos_per_run}) Scheduled compilation video to Facebook Page (post id {fb_id}) for release at {scheduled_time.strftime('%H:%M')} UTC!")
+                        uploads_info.append({
+                            "video_id": uploaded_video_id,
+                            "title": metadata['title'],
+                            "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z'),
+                            "type": "video"
+                        })
+                    else:
+                        uploaded_video_id = upload_video(
+                            processed_path,
+                            metadata,
+                            schedule_time=scheduled_time,
+                            token_info=token_info,
+                            token_path=token_path
+                        )
+                        videos_created += 1
+                        logging.info(f"[+] ({vidx + 1}/{videos_per_run}) Successfully uploaded & scheduled compilation video for release at {scheduled_time.strftime('%H:%M')} UTC!")
+                        uploads_info.append({
+                            "video_id": uploaded_video_id,
+                            "title": metadata['title'],
+                            "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z'),
+                            "type": "video"
+                        })
 
                     for c in used_clips:
                         mark_twitch_seen(c["video_id"])

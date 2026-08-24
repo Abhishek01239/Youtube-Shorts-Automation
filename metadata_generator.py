@@ -36,7 +36,7 @@ def generate_metadata(video_title, niche="gaming"):
     try:
         response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-4-scout-17b-16e-instruct",
+            model="llama-3.1-8b-instant",
             response_format={"type": "json_object"},
             temperature=0.7
         )
@@ -89,7 +89,7 @@ def generate_video_metadata(video_title, niche="gaming"):
     try:
         response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-4-scout-17b-16e-instruct",
+            model="llama-3.1-8b-instant",
             response_format={"type": "json_object"},
             temperature=0.7
         )
