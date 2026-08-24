@@ -21,6 +21,7 @@ jobs:
           - ExistingChannel
           - GAMES
           - MinecraftShorts
+          - FacebookGaming
     name: ${{ matrix.channel }}
     runs-on: ubuntu-latest
     timeout-minutes: 350
@@ -56,6 +57,9 @@ jobs:
           YOUTUBE_TOKEN_JSON_EXAMPLEGAMINGCHANNEL: ${{ secrets.YOUTUBE_TOKEN_JSON_EXAMPLEGAMINGCHANNEL }}
           YOUTUBE_TOKEN_JSON_GAMES: ${{ secrets.YOUTUBE_TOKEN_JSON_GAMES }}
           YOUTUBE_TOKEN_JSON_MINECRAFTSHORTS: ${{ secrets.YOUTUBE_TOKEN_JSON_MINECRAFTSHORTS }}
+          # Facebook Page (Graph API) credentials for the FacebookGaming channel:
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
           # Notification Configuration Secrets
           NOTIFICATION_PROVIDER: ${{ secrets.NOTIFICATION_PROVIDER }}
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}

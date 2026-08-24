@@ -15,6 +15,7 @@ from highlight_detector import get_highlights, get_full_clip_range
 from video_processor import process_video, process_compilation_video
 from metadata_generator import generate_metadata, generate_video_metadata
 from youtube_uploader import upload_short, upload_video, get_upload_count_today
+from facebook_uploader import upload_fb_video
 from notifier import notify_report
 
 
@@ -40,6 +41,9 @@ def cleanup_disk():
 def run_channel_pipeline(channel, default_count=6, default_gap=2):
     channel_name = channel["channel_name"]
     niche = channel.get("niche", "gaming")
+    # Destination platform: "youtube" (default) or "facebook".
+    platform = (channel.get("platform") or "youtube").lower()
+    channel_fb_cfg = channel.get("facebook")
 
     # Pause gate: if "paused_until": "YYYY-MM-DD" is set and today < that date,
     # skip this channel entirely (no sourcing, no uploads). Resumes automatically
@@ -242,6 +246,18 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 "title": metadata['title'],
                 "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             })
+
+            # --- Facebook parallel upload (best-effort, never aborts YT flow) ---
+            if platform == "facebook":
+                try:
+                    fb_id = upload_fb_video(
+                        processed_path, metadata,
+                        schedule_time=scheduled_time,
+                        channel=channel, is_short=True
+                    )
+                    logging.info(f"[+] Facebook short/reel published (post id {fb_id}) for YT channel '{channel_name}'")
+                except Exception as fb_e:
+                    logging.error(f"[!] Facebook short upload failed (non-fatal): {fb_e}")
             if source_type == "twitch":
                 mark_twitch_seen(video['video_id'])
             else:
@@ -354,6 +370,19 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                         "publish_time": scheduled_time.strftime('%Y-%m-%dT%H:%M:%S.000Z'),
                         "type": "video"
                     })
+
+                    # --- Facebook parallel upload (best-effort, never aborts YT flow) ---
+                    if platform == "facebook":
+                        try:
+                            fb_id = upload_fb_video(
+                                processed_path, metadata,
+                                schedule_time=scheduled_time,
+                                channel=channel, is_short=False
+                            )
+                            logging.info(f"[+] Facebook video scheduled (post id {fb_id}) for YT channel '{channel_name}'")
+                        except Exception as fb_e:
+                            logging.error(f"[!] Facebook video upload failed (non-fatal): {fb_e}")
+
                     for c in used_clips:
                         mark_twitch_seen(c["video_id"])
                 except Exception as e:

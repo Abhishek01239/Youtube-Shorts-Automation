@@ -62,5 +62,25 @@
       ]
     },
     "shorts_per_run": 15
+  },
+  {
+    "channel_name": "FacebookGaming",
+    "niche": "Minecraft gaming highlights and funny moments",
+    "platform": "facebook",
+    "upload_schedule": {
+      "interval_hours": 2
+    },
+    "videos_per_run": 3,
+    "facebook": {
+      "page_id_env": "FACEBOOK_PAGE_ID",
+      "access_token_env": "FACEBOOK_PAGE_ACCESS_TOKEN"
+    },
+    "source_configuration": {
+      "source_type": "twitch",
+      "target_games": [
+        "Minecraft"
+      ]
+    },
+    "shorts_per_run": 18
   }
 ]
