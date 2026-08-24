@@ -76,6 +76,20 @@ def _post_video(page_id, access_token, video_path, title, description,
         resp = requests.post(url, data=params, files=files, timeout=900)
     data = resp.json() if resp.content else {}
     if resp.status_code != 200 or "id" not in data:
+        err = data.get("error", {}) if isinstance(data, dict) else {}
+        code = err.get("code")
+        subcode = err.get("error_subcode")
+        # Common auth failures -> give an actionable message instead of raw JSON.
+        if code == 190 and subcode == 463:
+            raise Exception(
+                "Facebook token EXPIRED (code 190/subcode 463). The FACEBOOK_PAGE_ACCESS_TOKEN "
+                "secret holds a short-lived token. Regenerate a LONG-LIVED Page Access Token "
+                "(~60 days) and update the GitHub secret 'FACEBOOK_PAGE_ACCESS_TOKEN'."
+            )
+        if code == 190:
+            raise Exception(
+                "Facebook token invalid (code 190). Check FACEBOOK_PAGE_ACCESS_TOKEN / FACEBOOK_PAGE_ID."
+            )
         raise Exception(f"Facebook API {resp.status_code}: {data}")
     return data["id"]
 
@@ -103,12 +117,17 @@ def upload_fb_video(video_path, metadata, schedule_time=None,
     # Facebook has no "#shorts" convention; strip it for cleanliness.
     title = raw_title.replace("#shorts", "").replace("#Shorts", "").strip() or "Gaming Highlight"
 
+    # Strip any "#shorts"/"#Shorts" from incoming hashtags too (FB has no such tag).
+    def _clean_tags(t):
+        return " ".join(w for w in t.split() if w.lower() != "#shorts")
+
     description = metadata.get("description", "")
     if isinstance(metadata.get("hashtags"), list):
-        description += "\n\n" + " ".join(metadata["hashtags"])
+        description += "\n\n" + _clean_tags(" ".join(metadata["hashtags"]))
     elif isinstance(metadata.get("hashtags"), str):
-        description += "\n\n" + metadata["hashtags"]
-    description += "\n\n#gaming #minecraft #shorts" if is_short else "\n\n#gaming #minecraft"
+        description += "\n\n" + _clean_tags(metadata["hashtags"])
+    # Facebook has no #shorts tag convention; use neutral gaming tags.
+    description += "\n\n#gaming #minecraft #reels" if is_short else "\n\n#gaming #minecraft"
 
     kind = "Short/Reel" if is_short else "video"
     logging.info(f"[*] Uploading {video_path} to Facebook Page {page_id} ({kind})...")
