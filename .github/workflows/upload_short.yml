@@ -5,23 +5,25 @@ on:
     # Trigger ONCE daily at 00:30 UTC (06:00 AM IST)
     - cron: '30 0 * * *'
   workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Run only this channel (leave empty to run ALL channels in parallel)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   run-automation:
-    # Run all 4 channels in parallel; each gets its own 6h job limit so none is starved.
+    # Run all channels in parallel; each gets its own 6h job limit so none is starved.
+    # If a single channel is requested via manual dispatch, run only that one.
     strategy:
       fail-fast: false
       max-parallel: 4
       matrix:
-        channel:
-          - ExampleGamingChannel
-          - ExistingChannel
-          - GAMES
-          - MinecraftShorts
-          - FacebookGaming
+        channel: ${{ fromJSON(inputs.channel && format('["{0}"]', inputs.channel) || '["ExampleGamingChannel", "ExistingChannel", "GAMES", "MinecraftShorts", "FacebookGaming"]') }}
     name: ${{ matrix.channel }}
     runs-on: ubuntu-latest
     timeout-minutes: 350
