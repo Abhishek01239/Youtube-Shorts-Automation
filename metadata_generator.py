@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from groq import Groq
 from config import GROQ_API_KEY
 
@@ -53,11 +54,62 @@ def _available_chat_models(client):
     return _MODEL_CACHE
 
 
+def _extract_json(text):
+    """Pull a JSON object out of a model response.
+
+    Models sometimes wrap JSON in ```json fences or add prose around it. With
+    response_format=json_object most return raw JSON, but a few models still
+    emit fenced output that Groq's server-side validator rejects — so we parse
+    defensively instead of trusting the forced mode.
+    """
+    if text is None:
+        return None
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    # Strip ```json ... ``` fences
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fenced:
+        try:
+            return json.loads(fenced.group(1))
+        except Exception:
+            pass
+    # Last resort: first balanced-looking {...}
+    brace = re.search(r"\{.*\}", text, re.DOTALL)
+    if brace:
+        try:
+            return json.loads(brace.group(0))
+        except Exception:
+            pass
+    return None
+
+
+def _validate_metadata(obj):
+    """Ensure the parsed object has the fields pipeline expects."""
+    if not isinstance(obj, dict):
+        return False
+    if not obj.get("title") or not isinstance(obj.get("title"), str):
+        return False
+    if not obj.get("description") or not isinstance(obj.get("description"), str):
+        return False
+    return True
+
+
 def _call_groq(client, prompt):
-    """Try every available model until one returns valid JSON metadata."""
+    """Try every available model until one returns valid JSON metadata.
+
+    Robust against Groq's `json_validate_failed` (HTTP 400): when a model
+    fails validation under forced json_object mode, we retry the SAME model
+    WITHOUT the json_object mode (most models emit clean JSON that way) before
+    moving on to the next model. This stops the noisy model-failed spam and
+    gets a result from the preferred model instead of always falling back.
+    """
     models = _available_chat_models(client)
     last_err = None
     for model in models:
+        # Attempt 1: forced JSON mode (best for well-behaved models)
         try:
             response = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
@@ -65,10 +117,40 @@ def _call_groq(client, prompt):
                 response_format={"type": "json_object"},
                 temperature=0.7,
             )
-            return json.loads(response.choices[0].message.content), model
+            obj = _extract_json(response.choices[0].message.content)
+            if obj and _validate_metadata(obj):
+                return obj, model
         except Exception as e:
             last_err = e
-            print(f"[!] Groq model '{model}' failed: {e}; trying next model...")
+            err_text = str(e)
+            # 'json_validate_failed' -> retry same model without json mode
+            if "json_validate_failed" in err_text:
+                try:
+                    response = client.chat.completions.create(
+                        messages=[{"role": "user", "content": prompt}],
+                        model=model,
+                        temperature=0.7,
+                    )
+                    obj = _extract_json(response.choices[0].message.content)
+                    if obj and _validate_metadata(obj):
+                        return obj, model
+                except Exception as e2:
+                    last_err = e2
+            # fall through to next model
+        # Attempt 2 (used if forced-JSON returned bad/empty content but didn't raise)
+        if True:
+            try:
+                response = client.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model=model,
+                    temperature=0.7,
+                )
+                obj = _extract_json(response.choices[0].message.content)
+                if obj and _validate_metadata(obj):
+                    return obj, model
+            except Exception as e:
+                last_err = e
+        print(f"[!] Groq model '{model}' failed: {last_err}; trying next model...")
     print(f"[!] All Groq models failed ({last_err}); using fallback metadata.")
     return None, None
 
