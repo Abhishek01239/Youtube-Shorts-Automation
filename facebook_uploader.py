@@ -179,30 +179,36 @@ def _post_video_resumable(page_id, access_token, video_path, title, description,
 
 def _post_video(page_id, access_token, video_path, title, description,
                 is_short, schedule_time=None):
-    """Pick upload strategy by file size; fall back simple->resumable on 413."""
-    file_size = os.path.getsize(video_path)
-    if file_size > RESUMABLE_THRESHOLD:
+    """Pick upload strategy.
+
+    - Shorts/Reels (small files): simple multipart upload, upgrade to resumable
+      if Facebook rejects it with 413.
+    - Long-form videos (compilations): ALWAYS use resumable chunked upload.
+      Facebook's simple /{page}/videos multipart endpoint returns 413
+      "Request Entity Too Large" even for moderate sizes (observed on ~9-80MB
+      compilation files), and resumable is the supported path for any video.
+    """
+    if is_short:
         try:
-            return _post_video_resumable(page_id, access_token, video_path,
-                                          title, description, is_short, schedule_time)
-        except Exception as e:
-            if "413" in str(e):
-                # Already resumable but still too large? nothing more we can do.
-                raise
-            # Non-413 resumable error: try the simple endpoint as a last resort.
-            logging.warning(f"[!] Facebook resumable upload failed ({e}); trying simple upload...")
             return _post_video_simple(page_id, access_token, video_path,
                                       title, description, is_short, schedule_time)
-    # Small file: simple upload, upgrade to resumable if we hit 413.
+        except Exception as e:
+            if "413" in str(e) or "Request Entity Too Large" in str(e):
+                logging.warning("[!] Facebook simple upload 413 (file too large); switching to resumable...")
+                return _post_video_resumable(page_id, access_token, video_path,
+                                             title, description, is_short, schedule_time)
+            raise
+    # Long-form video: always resumable (avoids the 413 on simple /videos).
     try:
+        return _post_video_resumable(page_id, access_token, video_path,
+                                      title, description, is_short, schedule_time)
+    except Exception as e:
+        if "413" in str(e):
+            # Already resumable but still 413? nothing more we can do.
+            raise
+        logging.warning(f"[!] Facebook resumable upload failed ({e}); trying simple upload...")
         return _post_video_simple(page_id, access_token, video_path,
                                   title, description, is_short, schedule_time)
-    except Exception as e:
-        if "413" in str(e) or "Request Entity Too Large" in str(e):
-            logging.warning("[!] Facebook simple upload 413 (file too large); switching to resumable...")
-            return _post_video_resumable(page_id, access_token, video_path,
-                                         title, description, is_short, schedule_time)
-        raise
 
 
 def upload_fb_video(video_path, metadata, schedule_time=None,
