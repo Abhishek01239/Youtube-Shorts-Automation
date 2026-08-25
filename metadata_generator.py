@@ -20,10 +20,10 @@ def generate_metadata(video_title, niche="gaming"):
         return fallback_data
         
     client = Groq(api_key=GROQ_API_KEY)
-    
+
     prompt = f"""
     You are an expert YouTube Shorts creator. Generate metadata for a Shorts video in the "{niche}" niche, curated from a video titled: "{video_title}".
-    
+
     Output strictly in this JSON format:
     {{
         "title": "<Click-worthy title under 80 characters with 1-2 emojis>",
@@ -32,24 +32,33 @@ def generate_metadata(video_title, niche="gaming"):
         "tags": "comma, separated, list, of, 20, youtube, seo, tags, related to this niche/video"
     }}
     """
-    
-    try:
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-8b-instant",
-            response_format={"type": "json_object"},
-            temperature=0.7
-        )
-        data = json.loads(response.choices[0].message.content)
-        
-        # Ensure hashtag compliance
-        if "#shorts" not in data.get("hashtags", []):
-            data["hashtags"] = ["#shorts"] + data.get("hashtags", [])[:9]
-            
-        return data
-    except Exception as e:
-        print(f"[!] Groq API Error: {e}")
-        return fallback_data
+
+    # Try models in order; fall back to the next if one 404s / is unavailable.
+    MODELS = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "gemma2-9b-it",
+        "llama3-8b-8192",
+    ]
+    for model in MODELS:
+        try:
+            response = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=model,
+                response_format={"type": "json_object"},
+                temperature=0.7
+            )
+            data = json.loads(response.choices[0].message.content)
+
+            # Ensure hashtag compliance
+            if "#shorts" not in data.get("hashtags", []):
+                data["hashtags"] = ["#shorts"] + data.get("hashtags", [])[:9]
+
+            return data
+        except Exception as e:
+            print(f"[!] Groq model '{model}' failed: {e}; trying next model...")
+    print("[!] All Groq models failed; using fallback metadata.")
+    return fallback_data
 
 
 def generate_video_metadata(video_title, niche="gaming"):
@@ -86,21 +95,30 @@ def generate_video_metadata(video_title, niche="gaming"):
     }}
     """
 
-    try:
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-8b-instant",
-            response_format={"type": "json_object"},
-            temperature=0.7
-        )
-        data = json.loads(response.choices[0].message.content)
+    # Try models in order; fall back to the next if one 404s / is unavailable.
+    MODELS = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "gemma2-9b-it",
+        "llama3-8b-8192",
+    ]
+    for model in MODELS:
+        try:
+            response = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=model,
+                response_format={"type": "json_object"},
+                temperature=0.7
+            )
+            data = json.loads(response.choices[0].message.content)
 
-        # Long-form videos must never carry #shorts
-        data["hashtags"] = [h for h in data.get("hashtags", []) if h.lower() != "#shorts"]
-        if len(data["hashtags"]) < 9:
-            data["hashtags"] += fallback_data["hashtags"][: 9 - len(data["hashtags"])]
+            # Long-form videos must never carry #shorts
+            data["hashtags"] = [h for h in data.get("hashtags", []) if h.lower() != "#shorts"]
+            if len(data["hashtags"]) < 9:
+                data["hashtags"] += fallback_data["hashtags"][: 9 - len(data["hashtags"])]
 
-        return data
-    except Exception as e:
-        print(f"[!] Groq API Error: {e}")
-        return fallback_data
+            return data
+        except Exception as e:
+            print(f"[!] Groq model '{model}' failed: {e}; trying next model...")
+    print("[!] All Groq models failed; using fallback metadata.")
+    return fallback_data
