@@ -1,10 +1,19 @@
 import os
 import random
+import time
 import requests
 import logging
+from datetime import datetime, timezone, timedelta
 import config
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+# Max number of seen clip IDs we remember per channel. The Twitch "trending"
+# clips endpoint only returns a few hundred clips, so an ever-growing seen
+# list eventually covers the ENTIRE pool and find_twitch_clips returns [] forever
+# (this is what left ExampleGamingChannel with "No candidate videos"). Capping it
+# lets old clips rotate back into the candidate pool.
+MAX_SEEN = 500
 
 _TWITCH_TOKEN = None
 
@@ -51,13 +60,23 @@ def get_seen_videos():
         return set(line.strip() for line in f.readlines() if line.strip())
 
 def mark_video_seen(video_id):
-    """Appends a clip ID to the seen videos file."""
+    """Appends a clip ID to the seen videos file (capped to MAX_SEEN entries)."""
     seen_file = config.get_seen_videos_file()
     parent_dir = os.path.dirname(os.path.abspath(seen_file))
     if parent_dir:
         os.makedirs(parent_dir, exist_ok=True)
-    with open(seen_file, "a", encoding="utf-8") as f:
-        f.write(f"{video_id}\n")
+    # Cap the file so old clips rotate back into the candidate pool.
+    existing = []
+    if os.path.exists(seen_file):
+        with open(seen_file, "r", encoding="utf-8") as f:
+            existing = [l.strip() for l in f.readlines() if l.strip()]
+    if video_id in existing:
+        return
+    existing.append(video_id)
+    if len(existing) > MAX_SEEN:
+        existing = existing[-MAX_SEEN:]
+    with open(seen_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(existing) + "\n")
 
 def get_game_id(game_name, headers):
     """Resolves a Twitch game name to its Helix game ID."""
@@ -72,10 +91,31 @@ def get_game_id(game_name, headers):
         logging.warning(f"[!] Could not resolve game ID for '{game_name}': {e}")
     return None
 
+def _collect_unseen(clips, seen, candidates, game_name):
+    """Append clips whose id is not yet seen (helper for both query modes)."""
+    for clip in clips:
+        clip_id = clip.get("id")
+        if not clip_id or clip_id in seen:
+            continue
+        candidates.append({
+            "video_id": clip_id,
+            "title": clip.get("title", f"{game_name} Twitch Clip"),
+            "url": clip.get("url"),
+            "thumbnail_url": clip.get("thumbnail_url"),
+            "game_name": game_name,
+            "duration": clip.get("duration", 30)
+        })
+
+
 def find_twitch_clips(target_games=None):
     """
-    Queries Twitch Helix API for top trending clips across target game categories.
-    Iterates through games and paginates through results until fresh unseen candidate clips are found.
+    Queries Twitch Helix API for fresh clips across target game categories.
+
+    Fix for "No candidate videos" exhaustion: the default clips endpoint only
+    returns the CURRENT top ~hundred trending clips, so once a channel's
+    seen-list covers that pool it returns [] forever. We now ALSO query a
+    RECENCY window (clips created in the last N days) and paginate further,
+    so there is always fresh content to upload.
     """
     token = get_twitch_access_token()
     if not token:
@@ -94,51 +134,49 @@ def find_twitch_clips(target_games=None):
 
     candidates = []
 
+    # Look back across the last 3 days in daily windows. Twitch clips are
+    # queryable by started_at/ended_at; recent clips are almost always unseen.
+    now = datetime.now(timezone.utc)
+    windows = [
+        (now - timedelta(days=1), now),
+        (now - timedelta(days=3), now - timedelta(days=1)),
+        (None, None),  # fallback: the plain trending query (original behaviour)
+    ]
+
     for game_name in games:
         logging.info(f"[*] Searching Twitch for category: '{game_name}'...")
         game_id = get_game_id(game_name, headers)
         if not game_id:
             continue
 
-        url = f"https://api.twitch.tv/helix/clips?game_id={game_id}&first=100"
-        cursor = None
-        
-        try:
-            for page in range(3): # Paginate up to 3 pages (300 clips) to find unseen content
-                query_url = url
-                if cursor:
-                    query_url += f"&after={cursor}"
-                    
-                res = requests.get(query_url, headers=headers, timeout=10)
-                res.raise_for_status()
-                res_data = res.json()
-                clips = res_data.get("data", [])
-
-                for clip in clips:
-                    clip_id = clip.get("id")
-                    if not clip_id or clip_id in seen:
-                        continue
-
-                    candidates.append({
-                        "video_id": clip_id,
-                        "title": clip.get("title", f"{game_name} Twitch Clip"),
-                        "url": clip.get("url"),
-                        "thumbnail_url": clip.get("thumbnail_url"),
-                        "game_name": game_name,
-                        "duration": clip.get("duration", 30)
-                    })
-
-                cursor = res_data.get("pagination", {}).get("cursor")
-                if not cursor or len(clips) < 100:
-                    break
-
+        for (start, end) in windows:
             if candidates:
-                logging.info(f"[+] Found {len(candidates)} unseen candidate clips in '{game_name}' after searching paginated results")
                 break
+            try:
+                cursor = None
+                for page in range(4):  # up to 4 pages (400 clips) per window
+                    query_url = f"https://api.twitch.tv/helix/clips?game_id={game_id}&first=100"
+                    if start is not None:
+                        query_url += f"&started_at={start.isoformat()}&ended_at={end.isoformat()}"
+                    if cursor:
+                        query_url += f"&after={cursor}"
+                    res = requests.get(query_url, headers=headers, timeout=10)
+                    res.raise_for_status()
+                    res_data = res.json()
+                    clips = res_data.get("data", [])
+                    _collect_unseen(clips, seen, candidates, game_name)
+                    cursor = res_data.get("pagination", {}).get("cursor")
+                    if not cursor or len(clips) < 100:
+                        break
+                if candidates:
+                    logging.info(f"[+] Found {len(candidates)} unseen candidate clips in '{game_name}' (recency window)")
+                    break
+            except Exception as e:
+                logging.error(f"[!] Error fetching clips for game '{game_name}': {e}")
+                continue
 
-        except Exception as e:
-            logging.error(f"[!] Error fetching clips for game '{game_name}': {e}")
-            continue
+        if candidates:
+            break
 
     random.shuffle(candidates)
     return candidates
