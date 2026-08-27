@@ -134,14 +134,18 @@ def find_twitch_clips(target_games=None):
 
     candidates = []
 
-    # Look back across the last 3 days in daily windows. Twitch clips are
-    # queryable by started_at/ended_at; recent clips are almost always unseen.
+    # Walk back through recent time windows to find fresh, unseen clips.
+    # Twitch's Get Clips API requires RFC3339 UTC timestamps WITHOUT fractional
+    # seconds (e.g. 2026-08-24T21:55:36Z) and each window must stay small, so
+    # we step back in 2h increments across the last ~2 days. The trailing
+    # (None, None) keeps the original plain-trending behaviour as a fallback.
     now = datetime.now(timezone.utc)
-    windows = [
-        (now - timedelta(days=1), now),
-        (now - timedelta(days=3), now - timedelta(days=1)),
-        (None, None),  # fallback: the plain trending query (original behaviour)
-    ]
+    windows = []
+    for h in range(0, 48, 2):  # 2h steps, ~2 days back
+        end = now - timedelta(hours=h)
+        start = end - timedelta(hours=2)
+        windows.append((start, end))
+    windows.append((None, None))
 
     for game_name in games:
         logging.info(f"[*] Searching Twitch for category: '{game_name}'...")
@@ -157,7 +161,9 @@ def find_twitch_clips(target_games=None):
                 for page in range(4):  # up to 4 pages (400 clips) per window
                     query_url = f"https://api.twitch.tv/helix/clips?game_id={game_id}&first=100"
                     if start is not None:
-                        query_url += f"&started_at={start.isoformat()}&ended_at={end.isoformat()}"
+                        # RFC3339 UTC, seconds precision, 'Z' suffix (no frac/offset)
+                        fmt = lambda dt: dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                        query_url += f"&started_at={fmt(start)}&ended_at={fmt(end)}"
                     if cursor:
                         query_url += f"&after={cursor}"
                     res = requests.get(query_url, headers=headers, timeout=10)
