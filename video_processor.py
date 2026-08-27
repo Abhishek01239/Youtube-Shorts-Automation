@@ -1,5 +1,7 @@
 import os
 import random
+import shutil
+import subprocess
 import ffmpeg
 import config
 
@@ -111,7 +113,36 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
         return None
 
 
-def process_compilation_video(clip_segments, output_filename, max_duration=600):
+def get_video_duration(video_path):
+    """
+    Returns the actual duration (seconds, float) of a rendered video file using
+    ffprobe. Returns 0.0 if ffprobe is unavailable or the file can't be probed.
+    Used to HARD-VERIFY a minimum length requirement before upload (e.g. every
+    Facebook video must be > 3 minutes).
+    """
+    if not video_path or not os.path.exists(video_path):
+        return 0.0
+    probe = shutil.which("ffprobe") or os.path.join(
+        os.path.dirname(config.get_ffmpeg_path()), "ffprobe"
+    )
+    if not probe or not os.path.exists(probe):
+        # ffprobe missing — fall back to a best-effort estimate via ffmpeg
+        probe = config.get_ffmpeg_path()
+    try:
+        result = subprocess.run(
+            [probe, "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60
+        )
+        out = result.stdout.decode().strip()
+        if out:
+            return float(out)
+    except (subprocess.SubprocessError, ValueError, OSError):
+        pass
+    return 0.0
+
+
+def process_compilation_video(clip_segments, output_filename, max_duration=600, min_duration=0):
     """
     Builds a long-form YouTube video (16:9 1080p) by stitching several clip
     segments together into a single file. Each segment receives the same color /

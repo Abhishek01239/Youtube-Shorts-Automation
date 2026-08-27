@@ -71,6 +71,8 @@
       "interval_hours": 2
     },
     "videos_per_run": 3,
+    "min_video_seconds": 195,
+    "clips_per_video": 6,
     "facebook": {
       "page_id_env": "FACEBOOK_PAGE_ID",
       "access_token_env": "FACEBOOK_PAGE_ACCESS_TOKEN"
@@ -81,6 +83,6 @@
         "Minecraft"
       ]
     },
-    "shorts_per_run": 18
+    "shorts_per_run": 0
   }
 ]

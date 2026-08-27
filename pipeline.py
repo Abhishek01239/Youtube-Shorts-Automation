@@ -12,7 +12,7 @@ from video_finder import find_videos, find_playlist_videos, mark_video_seen as m
 from downloader import download_video
 from audio_analyzer import analyze_audio
 from highlight_detector import get_highlights, get_full_clip_range
-from video_processor import process_video, process_compilation_video
+from video_processor import process_video, process_compilation_video, get_video_duration
 from metadata_generator import generate_metadata, generate_video_metadata
 from youtube_uploader import upload_short, upload_video, get_upload_count_today
 from facebook_uploader import upload_fb_video
@@ -68,6 +68,12 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             logging.warning(f"[!] Invalid paused_until for '{channel_name}': {paused_until!r} (expected YYYY-MM-DD). Ignoring.")
 
     shorts_per_run = channel.get("shorts_per_run", default_count)
+    # Facebook-only channels: NO shorts. They publish videos > 3 minutes only.
+    if platform == "facebook":
+        shorts_per_run = 0
+    # Minimum rendered length for a Facebook video (seconds). Enforced in the
+    # video phase below — every uploaded FB video must exceed this (3 min + pad).
+    fb_min_video_seconds = channel.get("min_video_seconds", 195)
     
     # Resolve schedule
     schedule_config = channel.get("upload_schedule", {})
@@ -310,6 +316,17 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             video_candidates = find_twitch_clips(target_games=target_games)
             cursor = 0
 
+            # Facebook videos must be > 3 minutes. Estimate how many clips are
+            # needed: Twitch clips are <= 60s, so use a generous 45s avg and add
+            # headroom. YouTube/other channels keep the configured clips_per_video.
+            if platform == "facebook":
+                needed_clips = max(
+                    int(round(fb_min_video_seconds / 45.0)) + 1,
+                    clips_per_video
+                )
+            else:
+                needed_clips = clips_per_video
+
             for vidx in range(videos_per_run):
                 if get_upload_count_today() >= config.MAX_UPLOADS_PER_DAY:
                     logging.info("[!] Daily quota limit reached during video phase. Stopping video creation.")
@@ -317,7 +334,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
 
                 segments = []
                 used_clips = []
-                while len(segments) < clips_per_video and cursor < len(video_candidates):
+                while len(segments) < needed_clips and cursor < len(video_candidates):
                     clip = video_candidates[cursor]
                     cursor += 1
                     clip_id = clip["video_id"]
@@ -354,6 +371,19 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                         mark_twitch_seen(c["video_id"])
                     cleanup_disk()
                     continue
+
+                # HARD GUARANTEE: every Facebook video must be > 3 minutes.
+                if platform == "facebook":
+                    actual_dur = get_video_duration(processed_path)
+                    if actual_dur < fb_min_video_seconds:
+                        logging.error(
+                            f"[!] Facebook video too short ({actual_dur:.1f}s < {fb_min_video_seconds}s). "
+                            f"Discarding this attempt and retrying next run to protect the >3min requirement."
+                        )
+                        for c in used_clips:
+                            mark_twitch_seen(c["video_id"])
+                        cleanup_disk()
+                        continue
 
                 metadata = generate_video_metadata(used_clips[0]["title"], niche=niche)
                 scheduled_time = base_publish_time + timedelta(hours=(uploaded_count + videos_created) * interval_hours)
