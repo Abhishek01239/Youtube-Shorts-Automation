@@ -67,13 +67,14 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         except ValueError:
             logging.warning(f"[!] Invalid paused_until for '{channel_name}': {paused_until!r} (expected YYYY-MM-DD). Ignoring.")
 
-    shorts_per_run = channel.get("shorts_per_run", default_count)
-    # Facebook-only channels: NO shorts. They publish videos > 3 minutes only.
-    if platform == "facebook":
-        shorts_per_run = 0
-    # Minimum rendered length for a Facebook video (seconds). Enforced in the
-    # video phase below — every uploaded FB video must exceed this (3 min + pad).
-    fb_min_video_seconds = channel.get("min_video_seconds", 195)
+    # No Shorts for ANY channel now — only long-form videos are published.
+    shorts_per_run = 0
+    # Long-form video length target (seconds). Every long-form video is edited
+    # to land between min_video_seconds (20 min) and max_video_seconds (40 min).
+    min_video_seconds = channel.get("min_video_seconds", 1200)   # 20 minutes
+    max_video_seconds = channel.get("max_video_seconds", 2400)  # 40 minutes
+    # Keep the original clip audio with NO added background music.
+    use_bgm = bool(channel.get("use_bgm", False))
     
     # Resolve schedule
     schedule_config = channel.get("upload_schedule", {})
@@ -106,7 +107,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         
     logging.info(f"\n==================================================")
     logging.info(f"[*] Starting Pipeline for Channel: {channel_name}")
-    logging.info(f"Niche: {niche} | Target: {shorts_per_run} Shorts | Interval: {interval_hours}h")
+    logging.info(f"Niche: {niche} | Videos/run: {channel.get('videos_per_run', 0)} (no Shorts) | Interval: {interval_hours}h | BGM: {use_bgm}")
     logging.info(f"==================================================")
     
     # 2. Check upload quota today
@@ -316,17 +317,10 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             video_candidates = find_twitch_clips(target_games=target_games)
             cursor = 0
 
-            # Facebook videos must be > 3 minutes. Estimate how many clips are
-            # needed: Twitch clips are <= 60s, so use a generous 45s avg and add
-            # headroom. YouTube/other channels keep the configured clips_per_video.
-            if platform == "facebook":
-                needed_clips = max(
-                    int(round(fb_min_video_seconds / 45.0)) + 1,
-                    clips_per_video
-                )
-            else:
-                needed_clips = clips_per_video
-
+            # Gather clips until the accumulated raw duration lands inside the
+            # [min_video_seconds, max_video_seconds] window (20-40 min). This works
+            # for every platform (YouTube + Facebook) and stops adding once we'd
+            # overshoot the 40-minute ceiling.
             for vidx in range(videos_per_run):
                 if get_upload_count_today() >= config.MAX_UPLOADS_PER_DAY:
                     logging.info("[!] Daily quota limit reached during video phase. Stopping video creation.")
@@ -334,7 +328,10 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
 
                 segments = []
                 used_clips = []
-                while len(segments) < needed_clips and cursor < len(video_candidates):
+                accumulated = 0.0
+                while cursor < len(video_candidates) and (
+                    accumulated < min_video_seconds or len(segments) < 2
+                ):
                     clip = video_candidates[cursor]
                     cursor += 1
                     clip_id = clip["video_id"]
@@ -350,12 +347,19 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                         continue
 
                     seg_range = get_full_clip_range(clip_path)
-                    if seg_range["duration"] < 8:
+                    seg_dur = seg_range["duration"]
+                    if seg_dur < 8:
                         mark_twitch_seen(clip_id)
                         continue
 
+                    # Don't overshoot the 40-minute ceiling once we already have >= min
+                    if accumulated >= min_video_seconds and accumulated + seg_dur > max_video_seconds:
+                        # leave this clip for a future video (do NOT mark seen)
+                        break
+
                     segments.append((clip_path, seg_range["start"], seg_range["end"]))
                     used_clips.append(clip)
+                    accumulated += seg_dur
 
                 if len(segments) < 2:
                     logging.info("[-] Not enough clips available for another compilation video. Stopping video phase.")
@@ -363,7 +367,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
 
                 logging.info(f"\n>>> Building Long-form Video [{vidx + 1}/{videos_per_run}] from {len(segments)} clips for {channel_name}")
                 out_filename = f"video_{datetime.now().strftime('%H%M%S')}_{vidx + 1}.mp4"
-                processed_path = process_compilation_video(segments, out_filename)
+                processed_path = process_compilation_video(segments, out_filename, max_duration=max_video_seconds, min_duration=min_video_seconds, use_bgm=use_bgm)
 
                 if not processed_path or not os.path.exists(processed_path):
                     logging.error("[!] Compilation video processing failed.")
@@ -372,18 +376,19 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                     cleanup_disk()
                     continue
 
-                # HARD GUARANTEE: every Facebook video must be > 3 minutes.
-                if platform == "facebook":
-                    actual_dur = get_video_duration(processed_path)
-                    if actual_dur < fb_min_video_seconds:
-                        logging.error(
-                            f"[!] Facebook video too short ({actual_dur:.1f}s < {fb_min_video_seconds}s). "
-                            f"Discarding this attempt and retrying next run to protect the >3min requirement."
-                        )
-                        for c in used_clips:
-                            mark_twitch_seen(c["video_id"])
-                        cleanup_disk()
-                        continue
+                # HARD GUARANTEE: every long-form video must be within the
+                # [min_video_seconds, max_video_seconds] window (20-40 min).
+                actual_dur = get_video_duration(processed_path)
+                if actual_dur < min_video_seconds or actual_dur > max_video_seconds:
+                    logging.error(
+                        f"[!] Long-form video out of range ({actual_dur:.1f}s not in "
+                        f"[{min_video_seconds}s, {max_video_seconds}s]). Discarding and retrying "
+                        f"next run to protect the 20-40 min requirement."
+                    )
+                    for c in used_clips:
+                        mark_twitch_seen(c["video_id"])
+                    cleanup_disk()
+                    continue
 
                 metadata = generate_video_metadata(used_clips[0]["title"], niche=niche)
                 scheduled_time = base_publish_time + timedelta(hours=(uploaded_count + videos_created) * interval_hours)

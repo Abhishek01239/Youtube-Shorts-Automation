@@ -142,13 +142,14 @@ def get_video_duration(video_path):
     return 0.0
 
 
-def process_compilation_video(clip_segments, output_filename, max_duration=600, min_duration=0):
+def process_compilation_video(clip_segments, output_filename, max_duration=2400, min_duration=1200, use_bgm=False):
     """
-    Builds a long-form YouTube video (16:9 1080p) by stitching several clip
-    segments together into a single file. Each segment receives the same color /
-    denoise / sharpen grade as the Shorts processor, original audio is preserved,
-    and BGM is laid underneath at low volume. Output is capped at max_duration
-    seconds (default 10 min, safe under YouTube's long-form limit).
+    Builds a long-form video (16:9 1080p) by stitching several clip segments
+    together into a single file. Each segment receives the same color / denoise /
+    sharpen grade as the Shorts processor, and the ORIGINAL clip audio is kept
+    exactly as-is (no background music) unless use_bgm=True. Output is capped at
+    max_duration seconds (default 40 min = 2400s) and the pipeline enforces a
+    minimum length of min_duration seconds (default 20 min = 1200s).
 
     clip_segments: list of (video_path, start, end) tuples.
     Returns absolute path to the final MP4 or None on failure.
@@ -234,23 +235,33 @@ def process_compilation_video(clip_segments, output_filename, max_duration=600, 
                 pix_fmt="yuv420p", loglevel="error", threads=0
             ).run(overwrite_output=True, cmd=ffmpeg_cmd)
 
-        # Step C: lay BGM underneath the original audio
-        bgm_path = get_random_bgm()
-        if bgm_path:
+        # Step C: keep the ORIGINAL audio as-is (no background music) unless
+        # use_bgm is requested.
+        if use_bgm:
+            bgm_path = get_random_bgm()
+            if bgm_path:
+                merged = ffmpeg.input(merged_path)
+                bgm = (
+                    ffmpeg.input(bgm_path).audio
+                    .filter("atrim", duration=max_duration)
+                    .filter("volume", 0.15)
+                )
+                mixed = ffmpeg.filter([merged.audio, bgm], "amix", inputs=2, duration="first")
+                ffmpeg.output(
+                    merged.video, mixed, out_path,
+                    vcodec="copy", acodec="aac", preset="fast", t=max_duration,
+                    movflags="+faststart", loglevel="error", threads=0
+                ).run(overwrite_output=True, cmd=ffmpeg_cmd)
+            else:
+                os.replace(merged_path, out_path)
+        else:
+            # No BGM: trim to max_duration and copy the original audio verbatim.
             merged = ffmpeg.input(merged_path)
-            bgm = (
-                ffmpeg.input(bgm_path).audio
-                .filter("atrim", duration=max_duration)
-                .filter("volume", 0.15)
-            )
-            mixed = ffmpeg.filter([merged.audio, bgm], "amix", inputs=2, duration="first")
             ffmpeg.output(
-                merged.video, mixed, out_path,
-                vcodec="copy", acodec="aac", preset="fast", t=max_duration,
+                merged.video, merged.audio, out_path,
+                vcodec="copy", acodec="copy", t=max_duration,
                 movflags="+faststart", loglevel="error", threads=0
             ).run(overwrite_output=True, cmd=ffmpeg_cmd)
-        else:
-            os.replace(merged_path, out_path)
 
         if os.path.exists(out_path) and os.path.getsize(out_path) > 100000:
             print(f"[+] Long-form video saved: {out_path}")

@@ -2,8 +2,8 @@ name: Scheduled Twitch to YouTube Shorts Automation
 
 on:
   schedule:
-    # Trigger ONCE daily at 00:30 UTC (06:00 AM IST)
-    - cron: '30 0 * * *'
+    # Trigger ONCE daily at 03:30 UTC (09:00 AM IST — morning 5-10am window)
+    - cron: '30 3 * * *'
   workflow_dispatch:
     inputs:
       channel:
