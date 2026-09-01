@@ -97,5 +97,22 @@
         "Minecraft"
       ]
     }
+  },
+  {
+    "channel_name": "MinecraftShorts2",
+    "niche": "Minecraft gaming highlights and funny moments",
+    "upload_schedule": {
+      "interval_hours": 4
+    },
+    "videos_per_run": 0,
+    "shorts_per_run": 5,
+    "use_bgm": false,
+    "youtube_oauth_credentials": "data/channels/MinecraftShorts2/token.json",
+    "source_configuration": {
+      "source_type": "twitch",
+      "target_games": [
+        "Minecraft"
+      ]
+    }
   }
 ]
