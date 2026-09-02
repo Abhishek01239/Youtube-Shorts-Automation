@@ -84,8 +84,8 @@
     },
     "videos_per_run": 5,
     "shorts_per_run": 0,
-    "min_video_seconds": 1200,
-    "max_video_seconds": 2400,
+    "min_video_seconds": 300,
+    "max_video_seconds": 1200,
     "use_bgm": false,
     "facebook": {
       "page_id_env": "FACEBOOK_PAGE_ID",
