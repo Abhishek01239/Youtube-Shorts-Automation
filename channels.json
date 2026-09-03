@@ -3,10 +3,10 @@
     "channel_name": "ExampleGamingChannel",
     "niche": "Minecraft gaming highlights and funny moments",
     "upload_schedule": {
-      "interval_hours": 3
+      "interval_hours": 2
     },
-    "videos_per_run": 5,
-    "shorts_per_run": 0,
+    "videos_per_run": 2,
+    "shorts_per_run": 10,
     "min_video_seconds": 1200,
     "max_video_seconds": 2400,
     "use_bgm": false,
@@ -22,10 +22,10 @@
     "channel_name": "ExistingChannel",
     "niche": "gaming",
     "upload_schedule": {
-      "interval_hours": 3
+      "interval_hours": 2
     },
-    "videos_per_run": 5,
-    "shorts_per_run": 0,
+    "videos_per_run": 2,
+    "shorts_per_run": 10,
     "min_video_seconds": 1200,
     "max_video_seconds": 2400,
     "use_bgm": false,
@@ -41,10 +41,10 @@
     "channel_name": "GAMES",
     "niche": "Minecraft gaming highlights and funny moments",
     "upload_schedule": {
-      "interval_hours": 3
+      "interval_hours": 2
     },
-    "videos_per_run": 5,
-    "shorts_per_run": 0,
+    "videos_per_run": 2,
+    "shorts_per_run": 10,
     "min_video_seconds": 1200,
     "max_video_seconds": 2400,
     "use_bgm": false,
@@ -60,10 +60,10 @@
     "channel_name": "MinecraftShorts",
     "niche": "Minecraft gaming highlights and funny moments",
     "upload_schedule": {
-      "interval_hours": 3
+      "interval_hours": 2
     },
-    "videos_per_run": 5,
-    "shorts_per_run": 0,
+    "videos_per_run": 2,
+    "shorts_per_run": 10,
     "min_video_seconds": 1200,
     "max_video_seconds": 2400,
     "use_bgm": false,
@@ -80,12 +80,12 @@
     "niche": "Minecraft gaming highlights and funny moments",
     "platform": "facebook",
     "upload_schedule": {
-      "interval_hours": 3
+      "interval_hours": 2
     },
-    "videos_per_run": 5,
-    "shorts_per_run": 0,
-    "min_video_seconds": 300,
-    "max_video_seconds": 1200,
+    "videos_per_run": 2,
+    "shorts_per_run": 10,
+    "min_video_seconds": 1200,
+    "max_video_seconds": 2400,
     "use_bgm": false,
     "facebook": {
       "page_id_env": "FACEBOOK_PAGE_ID",
@@ -102,10 +102,12 @@
     "channel_name": "MinecraftShorts2",
     "niche": "Minecraft gaming highlights and funny moments",
     "upload_schedule": {
-      "interval_hours": 4
+      "interval_hours": 2
     },
-    "videos_per_run": 0,
-    "shorts_per_run": 5,
+    "videos_per_run": 2,
+    "shorts_per_run": 10,
+    "min_video_seconds": 1200,
+    "max_video_seconds": 2400,
     "use_bgm": false,
     "youtube_oauth_credentials": "data/channels/MinecraftShorts2/token.json",
     "source_configuration": {

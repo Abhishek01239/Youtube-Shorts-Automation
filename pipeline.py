@@ -300,9 +300,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         time.sleep(5)
         
     # ======================================================
-    # Long-form Video Phase: N compilation videos per run
-    # (same Twitch source; each video = several clips stitched
-    #  into one 16:9 1080p upload, scheduled like the shorts)
+    # VIDEO PHASE FIRST (user directs videos before shorts)
     # ======================================================
     videos_per_run = channel.get("videos_per_run", 0)
     clips_per_video = channel.get("clips_per_video", 5)
