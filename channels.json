@@ -24,7 +24,7 @@
     "upload_schedule": {
       "interval_hours": 2
     },
-    "videos_per_run": 2,
+    "videos_per_run": 0,
     "shorts_per_run": 10,
     "min_video_seconds": 1200,
     "max_video_seconds": 2400,
