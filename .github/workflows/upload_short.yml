@@ -3,7 +3,7 @@ name: Scheduled Twitch to YouTube Shorts Automation
 on:
   schedule:
     # Trigger ONCE daily at 03:30 UTC (09:00 AM IST — morning 5-10am window)
-    - cron: '30 3 * * *'
+    - cron: '30 0 * * *'
   workflow_dispatch:
     inputs:
       channel:
@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        channel: ${{ fromJSON(inputs.channel && format('["{0}"]', inputs.channel) || '["ExampleGamingChannel", "ExistingChannel", "GAMES", "MinecraftShorts", "FacebookGaming"]') }}
+        channel: ${{ fromJSON(inputs.channel && format('["{0}"]', inputs.channel) || '["ExampleGamingChannel", "ExistingChannel", "GAMES", "MinecraftShorts", "FacebookGaming", "MinecraftShorts2"]') }}
     name: ${{ matrix.channel }}
     runs-on: ubuntu-latest
     timeout-minutes: 350
