@@ -16,7 +16,8 @@
       "target_games": [
         "Minecraft"
       ]
-    }
+    },
+    "paused_until": "2026-09-14"
   },
   {
     "channel_name": "ExistingChannel",
@@ -35,7 +36,8 @@
       "target_games": [
         "Minecraft"
       ]
-    }
+    },
+    "paused_until": "2026-09-14"
   },
   {
     "channel_name": "GAMES",
@@ -54,7 +56,8 @@
       "target_games": [
         "Minecraft"
       ]
-    }
+    },
+    "paused_until": "2026-09-14"
   },
   {
     "channel_name": "MinecraftShorts",
@@ -73,7 +76,8 @@
       "target_games": [
         "Minecraft"
       ]
-    }
+    },
+    "paused_until": "2026-09-14"
   },
   {
     "channel_name": "FacebookGaming",
@@ -96,11 +100,12 @@
       "target_games": [
         "Minecraft"
       ]
-    }
+    },
+    "paused_until": "2026-09-14"
   },
   {
     "channel_name": "MinecraftShorts2",
-    "niche": "Minecraft gaming highlights and funny moments",
+    "niche": "News",
     "upload_schedule": {
       "interval_hours": 2
     },
@@ -115,6 +120,25 @@
       "target_games": [
         "Minecraft"
       ]
-    }
+    },
+    "paused_until": ""
+  },
+  {
+    "channel_name": "AINEWS",
+    "niche": "Breaking News",
+    "upload_schedule": {
+      "interval_hours": 2
+    },
+    "videos_per_run": 1,
+    "shorts_per_run": 10,
+    "use_bgm": false,
+    "youtube_oauth_credentials": "data/channels/AINEWS/token.json",
+    "source_configuration": {
+      "source_type": "youtube_search",
+      "query": "breaking news",
+      "max_subs": 500000,
+      "target_games": []
+    },
+    "platform": "youtube"
   }
 ]

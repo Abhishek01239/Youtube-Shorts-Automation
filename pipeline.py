@@ -190,15 +190,13 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             
         # 2. Analyze Audio
         has_voice, is_silent = analyze_audio(video_path)
-        mute_audio = False
+        mute_audio = False  # KEEP ORIGINAL AUDIO — NO MUTING, NO BGM (user request)
         if has_voice:
-            logging.info("[!] Voice detected. Original audio will be muted.")
-            mute_audio = True
+            logging.info("[+] Voice detected — keeping original audio (no mute)")
         elif is_silent:
-            logging.info("[!] Audio is silent. BGM will be added.")
-            mute_audio = True
+            logging.info("[+] Silent — keeping original audio (no BGM added)")
         else:
-            logging.info("[+] Clear game audio found. Preserving game audio with BGM.")
+            logging.info("[+] Original clip audio preserved — no BGM, no mute")
             
         # 3. Highlight Detection
         highlights = get_highlights(video_path, num_clips=1)
