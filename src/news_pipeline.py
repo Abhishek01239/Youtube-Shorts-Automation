@@ -13,8 +13,7 @@ from urllib.parse import urlparse
 import re
 
 # Import pipeline components
-from twitch_finder import mark_twitch_seen
-from twitch_downloader import download_twitch_clip
+
 from video_processor import process_video, get_video_duration
 from metadata_generator import generate_metadata
 from youtube_uploader import upload_short
