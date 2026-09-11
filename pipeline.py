@@ -20,9 +20,17 @@ from notifier import notify_report
 
 # Import the news pipeline for RSS processing
 try:
-    from news_pipeline import run_news_pipeline
-except ImportError:
-    run_news_pipeline = None
+    from src.news_pipeline import run_news_pipeline
+except ImportError as e:
+    # Fallback: try from repo root or module path
+    try:
+        import importlib.util, sys
+        spec = importlib.util.spec_from_file_location("news_pipeline", "src/news_pipeline.py")
+        news_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(news_mod)
+        run_news_pipeline = news_mod.run_news_pipeline
+    except Exception as e2:
+        run_news_pipeline = None
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
