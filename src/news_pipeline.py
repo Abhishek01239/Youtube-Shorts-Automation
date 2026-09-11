@@ -12,15 +12,25 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 import re
 
-# Import pipeline components
-
-from video_processor import process_video, get_video_duration
-from metadata_generator import generate_metadata
-from youtube_uploader import upload_short
-from facebook_uploader import upload_fb_video
-from audio_analyzer import analyze_audio
-from highlight_detector import get_highlights
-from config import set_active_channel, get_token_file
+# Import pipeline components (defer if missing from PYTHONPATH)
+try:
+    from video_processor import process_video, get_video_duration
+except ImportError: pass
+try:
+    from metadata_generator import generate_metadata
+except ImportError: pass
+try:
+    from youtube_uploader import upload_short
+except ImportError: pass
+try:
+    from audio_analyzer import analyze_audio
+except ImportError: pass
+try:
+    from highlight_detector import get_highlights
+except ImportError: pass
+try:
+    from config import set_active_channel, get_token_file
+except ImportError: pass
 
 
 def fetch_rss_headlines(channel_config):
