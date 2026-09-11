@@ -134,10 +134,10 @@
     "use_bgm": false,
     "youtube_oauth_credentials": "data/channels/AINEWS/token.json",
     "source_configuration": {
-      "source_type": "youtube_search",
-      "query": "breaking news",
-      "max_subs": 500000,
-      "target_games": []
+      "source_type": "twitch",
+      "target_games": [
+        "Minecraft"
+      ]
     },
     "platform": "youtube"
   }
