@@ -104,41 +104,44 @@
     "paused_until": "2026-09-14"
   },
   {
-    "channel_name": "MinecraftShorts2",
-    "niche": "News",
-    "upload_schedule": {
-      "interval_hours": 2
+      "channel_name": "MinecraftShorts2",
+      "niche": "Minecraft gaming highlights and funny moments",
+      "upload_schedule": {
+        "interval_hours": 2
+      },
+      "videos_per_run": 1,
+      "shorts_per_run": 10,
+      "min_video_seconds": 1200,
+      "max_video_seconds": 2400,
+      "use_bgm": false,
+      "youtube_oauth_credentials": "data/channels/MinecraftShorts2/token.json",
+      "source_configuration": {
+        "source_type": "twitch",
+        "target_games": [
+          "Minecraft"
+        ]
+      },
+      "paused_until": ""
     },
-    "videos_per_run": 1,
-    "shorts_per_run": 10,
-    "min_video_seconds": 1200,
-    "max_video_seconds": 2400,
-    "use_bgm": false,
-    "youtube_oauth_credentials": "data/channels/MinecraftShorts2/token.json",
-    "source_configuration": {
-      "source_type": "twitch",
-      "target_games": [
-        "Minecraft"
-      ]
-    },
-    "paused_until": ""
-  },
-  {
-    "channel_name": "AINEWS",
-    "niche": "Breaking News",
-    "upload_schedule": {
-      "interval_hours": 2
-    },
-    "videos_per_run": 1,
-    "shorts_per_run": 10,
-    "use_bgm": false,
-    "youtube_oauth_credentials": "data/channels/AINEWS/token.json",
-    "source_configuration": {
-      "source_type": "twitch",
-      "target_games": [
-        "Minecraft"
-      ]
-    },
-    "platform": "youtube"
-  }
+    {
+      "channel_name": "AINEWS",
+      "niche": "Breaking News",
+      "upload_schedule": {
+        "interval_hours": 2
+      },
+      "videos_per_run": 0,
+      "shorts_per_run": 5,
+      "use_bgm": false,
+      "youtube_oauth_credentials": "data/channels/AINEWS/token.json",
+      "source_configuration": {
+        "source_type": "rss",
+        "rss_feeds": [
+          "https://feeds.bbci.co.uk/news/world/rss.xml",
+          "https://www.reutersagency.com/feed/?best-topics=world&post_type=best",
+          "https://techcrunch.com/feed/",
+          "https://news.google.com/rss/search?q=technology&hl=en-US&gl=US&ceid=US:en"
+        ]
+      },
+      "platform": "youtube"
+    }
 ]

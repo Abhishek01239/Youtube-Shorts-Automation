@@ -18,6 +18,12 @@ from youtube_uploader import upload_short, upload_video, get_upload_count_today
 from facebook_uploader import upload_fb_video
 from notifier import notify_report
 
+# Import the news pipeline for RSS processing
+try:
+    from news_pipeline import run_news_pipeline
+except ImportError:
+    run_news_pipeline = None
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -129,6 +135,26 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
     source_config = channel.get("source_configuration", {})
     source_type = source_config.get("source_type", "twitch").lower()
     
+    # Handle RSS sources separately (news pipelines)
+    if source_type == "rss":
+        if run_news_pipeline is None:
+            raise ValueError("RSS source_type requires news_pipeline module. Please check src/news_pipeline.py")
+        
+        logging.info(f"[*] Processing AINEWS channel '{channel_name}' via RSS pipeline")
+        
+        # Run the news pipeline for this channel
+        news_result = run_news_pipeline(channel)
+        
+        return {
+            "channel_name": channel_name,
+            "shorts_created": news_result.get("shorts_created", 0),
+            "videos_created": 0,  # News pipeline doesn't create long-form videos
+            "uploads": news_result.get("uploads", []),
+            "status": news_result.get("status", "Failed"),
+            "error": news_result.get("error", None)
+        }
+    
+    # 4. Sourcing videos (original logic for Twitch/YouTube)
     videos = []
     if source_type == "twitch":
         target_games = source_config.get("target_games")
