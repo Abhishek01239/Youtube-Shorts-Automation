@@ -18,19 +18,20 @@ from youtube_uploader import upload_short, upload_video, get_upload_count_today
 from facebook_uploader import upload_fb_video
 from notifier import notify_report
 
-# Import the news pipeline for RSS processing
+# Import the news pipeline for RSS processing (direct file load for GH-Actions context)
+run_news_pipeline = None
 try:
-    from src.news_pipeline import run_news_pipeline
-except ImportError as e:
-    # Fallback: try from repo root or module path
-    try:
-        import importlib.util, sys
-        spec = importlib.util.spec_from_file_location("news_pipeline", "src/news_pipeline.py")
-        news_mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(news_mod)
-        run_news_pipeline = news_mod.run_news_pipeline
-    except Exception as e2:
-        run_news_pipeline = None
+    import os, importlib.util
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(current_dir, "src", "news_pipeline.py")
+    if not os.path.exists(file_path):
+        file_path = os.path.join(current_dir, "news_pipeline.py")
+    spec = importlib.util.spec_from_file_location("news_pipeline", file_path)
+    news_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(news_mod)
+    run_news_pipeline = getattr(news_mod, "run_news_pipeline", None)
+except Exception as e:
+    run_news_pipeline = None
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
