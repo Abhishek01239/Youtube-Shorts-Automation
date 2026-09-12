@@ -129,8 +129,8 @@ def create_news_clip(news_item, output_dir, platform="youtube"):
     try:
         # Minimal news video: black background + title text (requires ffmpeg)
         # Full production would use PIL + Manim; this satisfies upload path.
-        cmd = ['ffmpeg', '-y', '-f', 'lavfi', 'color=c=black:s=1280x720:d=15',
-               '-c:v', 'libx264', '-t', '15', video_path]
+        cmd = ['ffmpeg', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=1280x720:d=15',
+               '-t', '15', '-c:v', 'libx264', video_path]
         subprocess.run(cmd, check=True, capture_output=True)
         return video_path
     except Exception as e:
