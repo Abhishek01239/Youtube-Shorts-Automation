@@ -76,7 +76,7 @@ def process_news_channel(channel_config, platform="youtube"):
     results = []
     for item in news_items[:5]:
         print(f"[*] News item: {item['title']}")
-        results.append({"video_id": item["video_id"], "title": item["title"], "url": item["url"]})
+        results.append({"video_id": item["video_id"], "title": item["title"], "url": item["url"], "publish_time": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z'), "type": "short"})
     return {"channel_name": channel_name, "shorts_created": len(results), "uploads": results, "status": "Success", "error": None}
 
 def run_news_pipeline(channel_config):
