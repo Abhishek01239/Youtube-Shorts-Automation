@@ -97,7 +97,7 @@ def process_news_channel(channel_config, platform="youtube"):
         try:
             uploaded_id = upload_short(
                 video_path,
-                {"title": item["title"], "description": f"Breaking News: {item['title']}"},
+                {"title": item["title"], "description": f"Breaking News: {item['title']}", "tags": ["news", "breaking", "short", niche]},
                 schedule_time=datetime.now(timezone.utc),
                 token_path=channel_config.get('youtube_oauth_credentials')
             )
