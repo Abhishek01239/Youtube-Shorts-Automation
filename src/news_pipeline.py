@@ -78,7 +78,7 @@ def process_news_channel(channel_config, platform="youtube"):
         print(f"[*] News item: {item['title']}")
         video_path = f"data/processed/{item['video_id']}_news.mp4"
         # Create real video file (news bulletin) so upload succeeds
-        video_path = create_news_clip({**item, "video_id": item["video_id"]}, "data/processed", platform=platform)
+        video_path = create_news_clip({**item, "video_id": item["video_id"], "thumbnail_url": item.get("thumbnail_url", "")}, "data/processed", platform=platform)
         # Ensure the file exists (fallback to placeholder if generation fails)
         if not video_path or not os.path.exists(video_path):
             # Minimal placeholder: black 1080p 60s video via ffmpeg
@@ -123,21 +123,10 @@ def run_news_pipeline(channel_config):
 
 
 def create_news_clip(news_item, output_dir, platform="youtube"):
-    """Create video from news item (placeholder + text overlay via ffmpeg)."""
-    import subprocess, os
-    video_path = os.path.join(output_dir, f"news_{news_item['video_id']}.mp4")
-    try:
-        # Minimal news video: black background + title text (requires ffmpeg)
-        # Full production would use PIL + Manim; this satisfies upload path.
-        # Generate a simple black-frame video (avoids lavfi which fails on some runners)
-        # Use an input stream approach that avoids -f lavfi dependency
-        cmd = ['ffmpeg', '-y', '-f', 'lavfi', '-i', 'color=black:s=1280x720:d=15',
-               '-t', '15', '-c:v', 'libx264', video_path]
-        subprocess.run(cmd, check=True, capture_output=True)
-        return video_path
-    except Exception as e:
-        print(f"[!] create_news_clip failed: {e}")
-        return None
+    """Generate a news bulletin video: subtitle file + black slide via ffmpeg (free, no paid APIs)."""
+    from news_clip_builder import create_news_clip as builder_clip
+    return builder_clip(news_item, output_dir, platform)
+
 
 def mark_news_seen(video_id):
     pass  # Placeholder: no twitch dependency needed for AINEWS
