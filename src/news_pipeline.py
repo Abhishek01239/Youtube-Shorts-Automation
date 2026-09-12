@@ -131,9 +131,9 @@ def create_news_clip(news_item, output_dir, platform="youtube"):
         # Full production would use PIL + Manim; this satisfies upload path.
         # Generate a simple black-frame video (avoids lavfi which fails on some runners)
         # Use an input stream approach that avoids -f lavfi dependency
-        cmd = ['ffmpeg', '-y', '-loop', '1', '-i',
+        cmd = ['ffmpeg', '-y', '-f', 'image2', '-i',
                'C:/Users/ASUS/Youtube-Shorts-Automation/assets/black_1px.png',
-               '-t', '15', '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+               '-frames:v', '450', '-r', '30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
                '-vf', 'scale=1280:720', video_path]
         subprocess.run(cmd, check=True, capture_output=True)
         return video_path
