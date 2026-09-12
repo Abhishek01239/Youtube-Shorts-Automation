@@ -246,17 +246,28 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             
         scene = highlights[0]
         
-        # 4. Process into YouTube Short (9:16 vertical 1080p)
+        # 4. Process into YouTube Short (9:16 vertical 1080p) — defensive fallback
         out_filename = f"short_{video['video_id']}.mp4"
         processed_path = process_video(
-            video_path, 
-            scene['start'], 
-            scene['end'], 
-            out_filename, 
+            video_path,
+            scene['start'] if highlights and highlights[0] else 0,
+            scene['end'] if highlights and highlights[0] else (scene.get('duration', 60) if isinstance(scene, dict) else 60),
+            out_filename,
             mute_original=mute_audio
         )
-        
+
+        # Fallback: if process_video returns None/empty, copy original clip as placeholder
         if not processed_path or not os.path.exists(processed_path):
+            processed_path = video_path  # use original downloaded clip as fallback
+            if not os.path.exists(processed_path) or not video_path:
+                logging.error("[!] Both processed_path and original video_path missing for upload.")
+                # Skip upload gracefully rather than passing None to upload_short
+                if source_type == "twitch":
+                    mark_twitch_seen(video['video_id'])
+                else:
+                    mark_youtube_seen(video['video_id'])
+                cleanup_disk()
+                continue
             logging.error("[!] Video processing failed.")
             if source_type == "twitch":
                 mark_twitch_seen(video['video_id'])
