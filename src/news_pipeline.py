@@ -120,3 +120,23 @@ def run_news_pipeline(channel_config):
     except Exception as e:
         print(f"[!] AINEWS pipeline error: {e}")
         return {"channel_name": channel_config.get('channel_name', 'AINEWS'), "shorts_created": 0, "uploads": [], "status": "Failed", "error": str(e)}
+
+
+def create_news_clip(news_item, output_dir, platform="youtube"):
+    """Create video from news item (placeholder + text overlay via ffmpeg)."""
+    import subprocess, os
+    video_path = os.path.join(output_dir, f"news_{news_item['video_id']}.mp4")
+    try:
+        # Minimal news video: black background + title text (requires ffmpeg)
+        # Full production would use PIL + Manim; this satisfies upload path.
+        cmd = ['ffmpeg', '-y', '-f', 'lavfi', 'color=c=black:s=1280x720:d=15',
+               '-vf', f"drawtext=text={news_item['title']}:fontsize=24:fontcolor=white:x=10:y=10",
+               '-c:v', 'libx264', '-t', '15', video_path]
+        subprocess.run(cmd, check=True, capture_output=True)
+        return video_path
+    except Exception as e:
+        print(f"[!] create_news_clip failed: {e}")
+        return None
+
+def mark_news_seen(video_id):
+    pass  # Placeholder: no twitch dependency needed for AINEWS
