@@ -124,8 +124,16 @@ def run_news_pipeline(channel_config):
 
 def create_news_clip(news_item, output_dir, platform="youtube"):
     """Generate a news bulletin video: subtitle file + black slide via ffmpeg (free, no paid APIs)."""
-    from news_clip_builder import create_news_clip as builder_clip
-    return builder_clip(news_item, output_dir, platform)
+    try:
+        from news_clip_builder import create_news_clip as builder_clip
+        return builder_clip(news_item, output_dir, platform)
+    except ImportError:
+        import importlib.util, os
+        builder_path = os.path.join(os.path.dirname(__file__), 'news_clip_builder.py')
+        spec = importlib.util.spec_from_file_location('news_clip_builder', builder_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.create_news_clip(news_item, output_dir, platform)
 
 
 def mark_news_seen(video_id):
