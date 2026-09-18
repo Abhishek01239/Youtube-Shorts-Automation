@@ -1,0 +1,23 @@
+name: ClipPilot SaaS build
+on:
+  push:
+    paths:
+      - "saas/**"
+  pull_request:
+    paths:
+      - "saas/**"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: saas/package.json
+      - run: npm install
+      - run: npm run build
