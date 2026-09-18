@@ -1,0 +1,3 @@
+import crypto from "crypto";
+const key=()=>{const raw=process.env.OAUTH_ENCRYPTION_KEY||"";if(!raw)throw new Error("OAUTH_ENCRYPTION_KEY is required");return crypto.createHash("sha256").update(raw).digest();};
+export function encryptSecret(value:string){const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv("aes-256-gcm",key(),iv);const data=Buffer.concat([cipher.update(value,"utf8"),cipher.final()]);return [iv.toString("base64url"),cipher.getAuthTag().toString("base64url"),data.toString("base64url")].join(".");}
