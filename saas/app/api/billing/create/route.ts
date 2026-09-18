@@ -16,3 +16,4 @@ export async function POST(){
   return NextResponse.json({subscription_id:sub.id,checkout_url:(sub as any).short_url});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Razorpay error"},{status:502});}
 }
+export async function GET(){return POST();}
