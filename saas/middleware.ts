@@ -1,0 +1,4 @@
+import {createServerClient} from "@supabase/ssr";
+import {NextResponse} from "next/server";
+export async function middleware(req:Request){const res=NextResponse.next({request:req});const supabase=createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,{cookies:{getAll(){return req.headers.get("cookie")?.split("; ").filter(Boolean).map(x=>{const i=x.indexOf("=");return {name:x.slice(0,i),value:x.slice(i+1)}})||[]},setAll(cookies){cookies.forEach(({name,value,options})=>res.cookies.set(name,value,options))}}});const {data:{user}}=await supabase.auth.getUser();if(req.url.includes("/dashboard")&&!user)return NextResponse.redirect(new URL("/login",req.url));return res}
+export const config={matcher:["/dashboard/:path*"]};
