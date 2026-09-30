@@ -19,3 +19,4 @@ streamlink>=6.5.0
 feedparser>=6.0.11
 lxml>=5.2.0
 piper-tts>=1.2.0
+faster-whisper>=1.1.0
