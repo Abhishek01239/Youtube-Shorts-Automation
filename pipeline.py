@@ -13,6 +13,7 @@ from downloader import download_video
 from audio_analyzer import analyze_audio
 from highlight_detector import get_highlights, get_full_clip_range
 from video_processor import process_video, process_compilation_video, get_video_duration
+from minecraft_captions import add_captions
 from metadata_generator import generate_metadata, generate_video_metadata
 from youtube_uploader import upload_short, upload_video, get_upload_count_today
 from facebook_uploader import upload_fb_video
@@ -276,13 +277,30 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             cleanup_disk()
             continue
             
-        # 5. Metadata Generation (Pass the dynamic Niche parameter!)
+        # 5. Auto captions: burn speech-based Minecraft-style captions into the
+        # already-processed 9:16 Short before it reaches the uploader.
+        captioned_path = os.path.join(config.get_processed_dir(), f"captioned_{video['video_id']}.mp4")
+        try:
+            processed_path = add_captions(processed_path, captioned_path)
+            if not processed_path or not os.path.exists(processed_path):
+                raise RuntimeError("Caption generator returned no output file")
+            logging.info(f"[+] Auto captions added: {processed_path}")
+        except Exception as e:
+            logging.error(f"[!] Auto-caption generation failed for video {video['video_id']}: {e}")
+            if source_type == "twitch":
+                mark_twitch_seen(video['video_id'])
+            else:
+                mark_youtube_seen(video['video_id'])
+            cleanup_disk()
+            continue
+
+        # 6. Metadata Generation (Pass the dynamic Niche parameter!)
         metadata = generate_metadata(video['title'], niche=niche)
         
-        # 6. Calculate Scheduled Publish Time
+        # 7. Calculate Scheduled Publish Time
         scheduled_time = base_publish_time + timedelta(hours=uploaded_count * interval_hours)
         
-        # 7. Upload & Schedule the Short (YouTube OR Facebook, based on platform)
+        # 8. Upload & Schedule the Short (YouTube OR Facebook, based on platform)
         try:
             if platform == "facebook":
                 # Facebook-only channel: upload to the FB Page, never YouTube.
