@@ -26,7 +26,7 @@
       "interval_hours": 2
     },
     "videos_per_run": 1,
-    "shorts_per_run": 10,
+    "shorts_per_run": 3,
     "min_video_seconds": 1200,
     "max_video_seconds": 2400,
     "use_bgm": false,

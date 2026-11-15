@@ -83,7 +83,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         except ValueError:
             logging.warning(f"[!] Invalid paused_until for '{channel_name}': {paused_until!r} (expected YYYY-MM-DD). Ignoring.")
 
-    # Config-driven: shorts count from channels.json (10 for ExistingChannel, 0 for FB etc.)
+    # Config-driven: shorts count from channels.json (e.g. 3 for ExistingChannel)
     # Videos-only channels get videos_per_run > 0; shorts-only get shorts_per_run > 0
     shorts_per_run = channel.get("shorts_per_run", 10)
     # Long-form video length target (seconds). Every long-form video is edited
