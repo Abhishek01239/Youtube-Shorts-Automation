@@ -37,20 +37,6 @@ except Exception as e:
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-def add_streamer_credit(metadata, clips):
-    """Credits the streamer(s) whose clips are used, at the top of the description."""
-    names = []
-    for c in clips:
-        login = c.get("broadcaster_login")
-        if login and login not in [n[1] for n in names]:
-            names.append((c.get("broadcaster_name") or login, login))
-    if not names:
-        return metadata
-    credit = "\n".join(f"🎮 Clip from {name}, shared with permission: https://twitch.tv/{login}" for name, login in names)
-    metadata["description"] = credit + "\n\n" + (metadata.get("description") or "")
-    return metadata
-
-
 def cleanup_disk():
     """Cleans up temporary downloaded and processed video files to preserve storage."""
     logging.info("[*] Cleaning up temporary video files...")
@@ -182,8 +168,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
     videos = []
     if source_type == "twitch":
         target_games = source_config.get("target_games")
-        allowed_streamers = source_config.get("allowed_streamers") or []
-        videos = find_twitch_clips(target_games=target_games, allowed_streamers=allowed_streamers)
+        videos = find_twitch_clips(target_games=target_games)
     elif source_type == "youtube_search" or source_type == "youtube_api":
         query = source_config.get("query", niche)
         max_subs = source_config.get("max_subs", 100000)
@@ -292,7 +277,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             cleanup_disk()
             continue
             
-        # 5. Auto captions: burn speech-based captions into the
+        # 5. Auto captions: burn speech-based Minecraft-style captions into the
         # already-processed 9:16 Short before it reaches the uploader.
         captioned_path = os.path.join(config.get_processed_dir(), f"captioned_{video['video_id']}.mp4")
         try:
@@ -311,7 +296,6 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
 
         # 6. Metadata Generation (Pass the dynamic Niche parameter!)
         metadata = generate_metadata(video['title'], niche=niche)
-        add_streamer_credit(metadata, [video])
         
         # 7. Calculate Scheduled Publish Time
         scheduled_time = base_publish_time + timedelta(hours=uploaded_count * interval_hours)
@@ -391,8 +375,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         if get_upload_count_today() >= config.MAX_UPLOADS_PER_DAY:
             logging.info("[!] Daily quota limit reached. Skipping video phase.")
         else:
-            video_candidates = find_twitch_clips(target_games=source_config.get("target_games"),
-                                                 allowed_streamers=source_config.get("allowed_streamers") or [])
+            video_candidates = find_twitch_clips(target_games=target_games)
             cursor = 0
 
             # Gather clips until the accumulated raw duration lands inside the
@@ -469,7 +452,6 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                     continue
 
                 metadata = generate_video_metadata(used_clips[0]["title"], niche=niche)
-                add_streamer_credit(metadata, used_clips)
                 scheduled_time = base_publish_time + timedelta(hours=(uploaded_count + videos_created) * interval_hours)
 
                 try:

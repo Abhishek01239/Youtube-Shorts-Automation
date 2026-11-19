@@ -2,7 +2,7 @@
 """
 minecraft_captions.py
 Auto-captions a video from its speech using faster-whisper and burns
-bold outlined captions into the video (GTA-style Shorts look).
+Minecraft-style pixel text into the video.
 
 Pipeline slot:
     Twitch clip -> crop/process to 9:16 -> auto captions -> upload to Shorts
@@ -20,8 +20,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-FONT_NAME = "Roboto"
-FONT_DIR = Path(__file__).parent / "assets" / "fonts"
+FONT_NAME = "Monocraft"
+FONT_DIR = Path(__file__).parent / "fonts"
 WHISPER_MODEL = "small"
 WORDS_PER_CAPTION = 3
 MAX_CHARS = 16
@@ -110,7 +110,7 @@ def clean(text):
 def build_ass(chunks, width, height):
     ref = min(width, height * 9 / 16)
     size = int(ref * 0.075)
-    outline = max(3, int(size * 0.09))
+    outline = max(2, int(size * 0.06))
     shadow = max(3, int(size * 0.09))
     margin_v = int(height * BOTTOM_MARGIN)
 
@@ -126,7 +126,7 @@ def build_ass(chunks, width, height):
         "Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,"
         "Alignment,MarginL,MarginR,MarginV,Encoding",
         f"Style: Default,{FONT_NAME},{size},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
-        f"-1,0,0,0,100,100,0,0,1,{outline},{shadow},2,40,40,{margin_v},1",
+        f"0,0,0,0,100,100,0,0,1,{outline},{shadow},2,40,40,{margin_v},1",
         "",
         "[Events]",
         "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text",
@@ -201,7 +201,7 @@ def add_captions(input_path, output_path=None, language=None):
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Auto captions")
+    ap = argparse.ArgumentParser(description="Minecraft-style auto captions")
     ap.add_argument("input")
     ap.add_argument("output", nargs="?")
     ap.add_argument("--lang", default=None)
