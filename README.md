@@ -110,3 +110,13 @@ Add the following Repository Secrets under **Settings** $\rightarrow$ **Secrets 
 ├── pipeline.py               # Main trigger controller & workflow executor
 └── .github/workflows/        # Scheduled GitHub Actions cron pipeline
 ```
+
+## Pro Edit workflow
+
+Actions tab -> **Pro Edit a Clip** -> **Run workflow**, paste a clip link (Google Drive share link or a direct
+.mp4 URL), optionally a hook title and an on-screen credit. Download the finished Short from the run's
+**Artifacts**. Or run it locally: `python pro_editor.py in.mp4 out.mp4 --title "Hook" --credit "twitch.tv/name"`.
+
+Each Short gets blurred-background framing for wide gameplay, word-by-word captions (faster-whisper, no API
+key), a hook title, a punch-in zoom with a synthesized impact hit on the most exciting second, color grade,
+-14 LUFS audio and a progress bar.

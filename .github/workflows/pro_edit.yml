@@ -1,0 +1,89 @@
+name: Pro Edit a Clip
+
+# Paste a link to a clip (Google Drive share link or a direct .mp4 link) and get back a
+# pro-edited vertical Short: framing, word-by-word captions, hook title, punch-in zoom with
+# impact hit, color grade, -14 LUFS audio and a progress bar. Download it from the run's
+# "Artifacts" section.
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'Clip link (Google Drive share link or direct .mp4 URL)'
+        required: true
+        type: string
+      title:
+        description: 'Hook text shown for the first 3 seconds (optional)'
+        required: false
+        default: ''
+        type: string
+      credit:
+        description: 'Credit shown on screen, e.g. twitch.tv/streamer (optional)'
+        required: false
+        default: ''
+        type: string
+      layout:
+        description: 'Framing'
+        required: false
+        default: 'auto'
+        type: choice
+        options: [auto, blur, fill]
+      captions:
+        description: 'Burn word-by-word captions'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  edit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install FFmpeg and Python packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install faster-whisper gdown
+
+      - name: Download clip
+        env:
+          VIDEO_URL: ${{ inputs.video_url }}
+        run: |
+          mkdir -p work
+          if echo "$VIDEO_URL" | grep -q "drive.google.com"; then
+            gdown --fuzzy "$VIDEO_URL" -O work/input.mp4
+          else
+            curl -fL --retry 3 -o work/input.mp4 "$VIDEO_URL"
+          fi
+          ffprobe -v error -show_entries format=duration -of csv=p=0 work/input.mp4
+
+      - name: Pro edit
+        env:
+          TITLE: ${{ inputs.title }}
+          CREDIT: ${{ inputs.credit }}
+          LAYOUT: ${{ inputs.layout }}
+          CAPTIONS: ${{ inputs.captions }}
+        run: |
+          args=()
+          [ -n "$TITLE" ] && args+=(--title "$TITLE")
+          [ -n "$CREDIT" ] && args+=(--credit "$CREDIT")
+          [ "$LAYOUT" != "auto" ] && args+=(--layout "$LAYOUT")
+          [ "$CAPTIONS" != "true" ] && args+=(--no-captions)
+          python pro_editor.py work/input.mp4 work/pro-edit.mp4 "${args[@]}"
+
+      - name: Upload edited Short
+        uses: actions/upload-artifact@v4
+        with:
+          name: pro-edited-short
+          path: work/pro-edit.mp4
+          retention-days: 7
