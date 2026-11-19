@@ -125,3 +125,16 @@ uploads nothing. Every upload credits the streamer at the top of the description
   "allowed_streamers": ["your_twitch_name", "streamer_who_said_yes"]
 }
 ```
+
+## Clip Radar
+
+`.github/workflows/clip_radar.yml` runs every 3 hours (or manually from the Actions tab) and reports the
+most-viewed recent GTA 6 clips from the streamers in `clip_radar.json`, plus who is live right now.
+It only reads public clip info through the official Twitch API and never downloads or uploads video.
+
+- Report: `data/clip_radar/latest.md` and the workflow run's summary page.
+- Telegram: new top clips and live streamers are sent to your chat if `TELEGRAM_BOT_TOKEN` and
+  `TELEGRAM_CHAT_ID` secrets are set (each clip is only sent once).
+- Edit `clip_radar.json` to change streamers, games, the lookback window, or the minimum views.
+
+Uses the existing `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` secrets.
