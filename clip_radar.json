@@ -1,7 +1,0 @@
-{
-  "games": ["Grand Theft Auto VI"],
-  "streamers": ["kaicenat", "ishowspeed", "ludwig", "jynxzi", "nickmercs", "sypherpk"],
-  "lookback_hours": 24,
-  "top_clips": 15,
-  "min_views": 500
-}
