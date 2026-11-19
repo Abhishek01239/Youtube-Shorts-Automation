@@ -92,7 +92,7 @@ def get_game_id(game_name, headers):
     return None
 
 def _collect_unseen(clips, seen, candidates, game_name):
-    """Append clips whose id is not yet seen (helper for both query modes)."""
+    """Append clips whose id is not yet seen."""
     for clip in clips:
         clip_id = clip.get("id")
         if not clip_id or clip_id in seen:
@@ -103,87 +103,91 @@ def _collect_unseen(clips, seen, candidates, game_name):
             "url": clip.get("url"),
             "thumbnail_url": clip.get("thumbnail_url"),
             "game_name": game_name,
-            "duration": clip.get("duration", 30)
+            "duration": clip.get("duration", 30),
+            "broadcaster_name": clip.get("broadcaster_name"),
+            "broadcaster_login": clip.get("_broadcaster_login"),
         })
 
 
-def find_twitch_clips(target_games=None):
-    """
-    Queries Twitch Helix API for fresh clips across target game categories.
+def resolve_streamers(logins, headers):
+    """Resolves Twitch usernames to {id: login}. Unknown names are logged and skipped."""
+    clean = sorted({l.strip().lstrip("@").lower() for l in logins if l and l.strip()})
+    found = {}
+    for i in range(0, len(clean), 100):
+        batch = clean[i:i + 100]
+        try:
+            res = requests.get("https://api.twitch.tv/helix/users", headers=headers,
+                               params=[("login", l) for l in batch], timeout=10)
+            res.raise_for_status()
+            for u in res.json().get("data", []):
+                found[u["id"]] = u["login"]
+        except Exception as e:
+            logging.error(f"[!] Could not resolve Twitch streamers {batch}: {e}")
+    missing = set(clean) - set(found.values())
+    if missing:
+        logging.warning(f"[!] Twitch streamers not found, skipping: {', '.join(sorted(missing))}")
+    return found
 
-    Fix for "No candidate videos" exhaustion: the default clips endpoint only
-    returns the CURRENT top ~hundred trending clips, so once a channel's
-    seen-list covers that pool it returns [] forever. We now ALSO query a
-    RECENCY window (clips created in the last N days) and paginate further,
-    so there is always fresh content to upload.
+
+def find_twitch_clips(target_games=None, allowed_streamers=None, days=7):
     """
+    Finds fresh clips of the target games, ONLY from streamers on the channel's
+    `allowed_streamers` list (streamers who gave permission to clip, plus your own
+    channel). Clips from anyone else are never picked up. An empty list means no
+    clips: the channel uploads nothing until streamers are added.
+    """
+    if not allowed_streamers:
+        logging.warning("[!] No allowed_streamers configured for this channel: skipping Twitch clips. "
+                        "Add streamers who gave you permission (or your own channel) to "
+                        "source_configuration.allowed_streamers in channels.json.")
+        return []
+
     token = get_twitch_access_token()
     if not token:
         logging.error("Failed to authenticate with Twitch API.")
         return []
 
     client_id = (config.TWITCH_CLIENT_ID or "").strip()
-    headers = {
-        "Client-ID": client_id,
-        "Authorization": f"Bearer {token}"
-    }
+    headers = {"Client-ID": client_id, "Authorization": f"Bearer {token}"}
 
-    seen = get_seen_videos()
     games = list(target_games) if target_games is not None else list(config.TARGET_GAMES)
-    random.shuffle(games)
+    game_ids = {}
+    for game_name in games:
+        gid = get_game_id(game_name, headers)
+        if gid:
+            game_ids[gid] = game_name
+    if not game_ids:
+        logging.error(f"[!] None of the target games were found on Twitch: {games}")
+        return []
 
+    streamers = resolve_streamers(allowed_streamers, headers)
+    seen = get_seen_videos()
+    started_at = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     candidates = []
 
-    # Walk back through recent time windows to find fresh, unseen clips.
-    # Twitch's Get Clips API requires RFC3339 UTC timestamps WITHOUT fractional
-    # seconds (e.g. 2026-08-24T21:55:36Z) and each window must stay small, so
-    # we step back in 2h increments across the last ~2 days. The trailing
-    # (None, None) keeps the original plain-trending behaviour as a fallback.
-    now = datetime.now(timezone.utc)
-    windows = []
-    for h in range(0, 48, 2):  # 2h steps, ~2 days back
-        end = now - timedelta(hours=h)
-        start = end - timedelta(hours=2)
-        windows.append((start, end))
-    windows.append((None, None))
-
-    for game_name in games:
-        logging.info(f"[*] Searching Twitch for category: '{game_name}'...")
-        game_id = get_game_id(game_name, headers)
-        if not game_id:
-            continue
-
-        for (start, end) in windows:
-            if candidates:
-                break
-            try:
-                cursor = None
-                for page in range(4):  # up to 4 pages (400 clips) per window
-                    query_url = f"https://api.twitch.tv/helix/clips?game_id={game_id}&first=100"
-                    if start is not None:
-                        # RFC3339 UTC, seconds precision, 'Z' suffix (no frac/offset)
-                        fmt = lambda dt: dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-                        query_url += f"&started_at={fmt(start)}&ended_at={fmt(end)}"
-                    if cursor:
-                        query_url += f"&after={cursor}"
-                    res = requests.get(query_url, headers=headers, timeout=10)
-                    res.raise_for_status()
-                    res_data = res.json()
-                    clips = res_data.get("data", [])
-                    _collect_unseen(clips, seen, candidates, game_name)
-                    cursor = res_data.get("pagination", {}).get("cursor")
-                    if not cursor or len(clips) < 100:
-                        break
-                if candidates:
-                    logging.info(f"[+] Found {len(candidates)} unseen candidate clips in '{game_name}' (recency window)")
+    for broadcaster_id, login in streamers.items():
+        logging.info(f"[*] Checking @{login} for clips of {', '.join(game_ids.values())}...")
+        cursor = None
+        try:
+            for _ in range(3):  # up to 300 most-viewed clips from the window
+                params = {"broadcaster_id": broadcaster_id, "first": 100, "started_at": started_at}
+                if cursor:
+                    params["after"] = cursor
+                res = requests.get("https://api.twitch.tv/helix/clips", headers=headers, params=params, timeout=10)
+                res.raise_for_status()
+                data = res.json()
+                for clip in data.get("data", []):
+                    game_name = game_ids.get(clip.get("game_id"))
+                    if game_name:
+                        clip["_broadcaster_login"] = login
+                        _collect_unseen([clip], seen, candidates, game_name)
+                cursor = data.get("pagination", {}).get("cursor")
+                if not cursor:
                     break
-            except Exception as e:
-                logging.error(f"[!] Error fetching clips for game '{game_name}': {e}")
-                continue
+        except Exception as e:
+            logging.error(f"[!] Error fetching clips for @{login}: {e}")
 
-        if candidates:
-            break
-
+    logging.info(f"[+] Found {len(candidates)} unseen clips from {len(streamers)} allowed streamer(s)")
     random.shuffle(candidates)
     return candidates
 

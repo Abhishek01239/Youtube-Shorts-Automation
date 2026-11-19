@@ -244,7 +244,7 @@ def upload_fb_video(video_path, metadata, schedule_time=None,
     elif isinstance(metadata.get("hashtags"), str):
         description += "\n\n" + _clean_tags(metadata["hashtags"])
     # Facebook has no #shorts tag convention; use neutral gaming tags.
-    description += "\n\n#gaming #minecraft #reels" if is_short else "\n\n#gaming #minecraft"
+    description += "\n\n#gaming #gta6 #reels" if is_short else "\n\n#gaming #gta6"
 
     kind = "Short/Reel" if is_short else "video"
     logging.info(f"[*] Uploading {video_path} to Facebook Page {page_id} ({kind})...")

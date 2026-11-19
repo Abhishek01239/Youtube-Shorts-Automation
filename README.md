@@ -110,3 +110,18 @@ Add the following Repository Secrets under **Settings** $\rightarrow$ **Secrets 
 ├── pipeline.py               # Main trigger controller & workflow executor
 └── .github/workflows/        # Scheduled GitHub Actions cron pipeline
 ```
+
+## GTA 6 niche: allowed streamers only
+
+All gaming channels target **Grand Theft Auto VI**. Twitch clips are taken **only** from streamers listed in
+each channel's `source_configuration.allowed_streamers` in `channels.json`: streamers who gave you permission
+to clip them, plus your own channel. Nobody else's clips are picked up, and an empty list means the channel
+uploads nothing. Every upload credits the streamer at the top of the description.
+
+```json
+"source_configuration": {
+  "source_type": "twitch",
+  "target_games": ["Grand Theft Auto VI"],
+  "allowed_streamers": ["your_twitch_name", "streamer_who_said_yes"]
+}
+```
