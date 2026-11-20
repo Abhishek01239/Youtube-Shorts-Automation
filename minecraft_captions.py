@@ -54,10 +54,15 @@ def probe_size(video):
     return int(s["width"]), int(s["height"])
 
 
-def transcribe(video, language=None):
-    from faster_whisper import WhisperModel
+_MODEL = None
 
-    model = WhisperModel(WHISPER_MODEL, device="auto", compute_type="auto")
+
+def transcribe(video, language=None):
+    global _MODEL
+    if _MODEL is None:  # load once per run, not once per clip
+        from faster_whisper import WhisperModel
+        _MODEL = WhisperModel(WHISPER_MODEL, device="auto", compute_type="auto")
+    model = _MODEL
     segments, _ = model.transcribe(
         str(video), word_timestamps=True, vad_filter=True, language=language
     )
@@ -164,7 +169,9 @@ def build_ass(chunks, width, height, font_name="Luckiest Guy", scale=1.0):
     return "\n".join(lines) + "\n"
 
 
-def add_captions(input_path, output_path=None, language=None, font=None):
+def add_captions(input_path, output_path=None, language=None, font=None, words=None):
+    """words: optional pre-computed (start, end, text) list on this video's timeline;
+    skips the Whisper pass when given."""
     input_path = Path(input_path).resolve()
     output_path = (
         Path(output_path).resolve()
@@ -173,7 +180,8 @@ def add_captions(input_path, output_path=None, language=None, font=None):
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    words = transcribe(input_path, language)
+    if words is None:
+        words = transcribe(input_path, language)
     if not words:
         print("[captions] no speech detected, passing video through unchanged")
         shutil.copy(input_path, output_path)

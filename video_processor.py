@@ -17,7 +17,10 @@ def get_font_path():
     if not files: return None
     return os.path.join(config.FONTS_DIR, files[0])
 
-def _frame_vertical(video, framing="blur"):
+SPLIT_FACE_H = 640  # top panel height in the facecam split layout
+
+
+def _frame_vertical(video, framing="blur", facecam=None):
     """
     Turns any input into a 1080x1920 vertical frame.
 
@@ -25,7 +28,27 @@ def _frame_vertical(video, framing="blur"):
                     loses ~2/3 of a 16:9 frame, including corner facecams/HUD).
     framing="blur": show the WHOLE frame, full width, over a blurred, dimmed,
                     zoomed copy of itself filling the rest of the screen.
+    framing="split": streamer facecam (crop box from smart_editing.detect_facecam)
+                    in a 1080x640 panel on top, gameplay filling the 1080x1280 below.
     """
+    if framing == "split" and facecam:
+        fx, fy, fw, fh = facecam
+        parts = video.filter_multi_output("split")
+        face = (
+            parts[0]
+            .filter("crop", fw, fh, fx, fy)
+            .filter("scale", 1080, SPLIT_FACE_H, flags="lanczos")
+            .filter("setsar", 1)
+        )
+        game_h = 1920 - SPLIT_FACE_H
+        game = (
+            parts[1]
+            .filter("scale", 1080, game_h, force_original_aspect_ratio="increase", flags="lanczos")
+            .filter("crop", 1080, game_h)
+            .filter("setsar", 1)
+        )
+        return ffmpeg.filter([face, game], "vstack", inputs=2)
+
     if framing == "crop":
         v = video.filter("scale", -1, 1920, flags="lanczos")
         return v.filter("crop", w=1080, h=1920, x="(in_w-1080)/2", y=0)
@@ -48,7 +71,16 @@ def _frame_vertical(video, framing="blur"):
     return v.filter("setsar", 1)
 
 
-def process_video(video_path, start, end, output_filename, mute_original=False, framing="blur"):
+def _apply_punch_ins(v, zoom):
+    """Quick zoom + shake at hype moments (expressions from smart_editing.zoom_expressions)."""
+    if not zoom:
+        return v
+    v = v.filter("scale", w=zoom["w"], h=zoom["h"], eval="frame", flags="bicubic")
+    return v.filter("crop", 1080, 1920, zoom["x"], zoom["y"])
+
+
+def process_video(video_path, start, end, output_filename, mute_original=False, framing="blur",
+                  facecam=None, zoom=None):
     """
     Processes a landscape gameplay video into a high-quality YouTube Short.
     Guarantees strict duration <= 45s for YouTube Shorts compliance.
@@ -68,10 +100,13 @@ def process_video(video_path, start, end, output_filename, mute_original=False, 
     audio = stream.audio
     
     # 1-2. Fit into a 9:16 (1080x1920) frame: blurred-background fill or centre crop
-    v = _frame_vertical(video, framing)
+    v = _frame_vertical(video, framing, facecam)
     
     # 3. Speed up video to 1.2x
     v = v.filter("setpts", "0.833333*PTS")
+
+    # 3b. Zoom punch-ins on hype moments (timed on the sped-up timeline)
+    v = _apply_punch_ins(v, zoom)
     
     # 4. Light denoise
     v = v.filter("hqdn3d", 1.0, 1.0, 3.0, 3.0)

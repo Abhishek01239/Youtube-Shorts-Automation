@@ -17,6 +17,22 @@ An automated production pipeline that fetches trending gaming clips from the **T
 
 ---
 
+## 🎨 Shorts Editing Options (per channel, in `channels.json`)
+
+Every Short goes through: AI clip picker → layout → zoom punch-ins → captions → headline + streamer credit → quality mastering → upload. All options are optional; defaults shown.
+
+| Key | Default | What it does |
+|---|---|---|
+| `min_clip_score` | `5` | AI clip picker: Groq rates each clip 1-10 from its transcript, title and views; lower scores are skipped. `0` disables. Needs `GROQ_API_KEY` (clips are kept if scoring fails). |
+| `framing` | `"auto"` | `"auto"`: facecam split layout if a streamer facecam is found, else `"blur"`. `"split"`, `"blur"` (full frame over a blurred background) or `"crop"` (old centre crop). |
+| `punch_ins` | `true` | Quick zoom + shake on the loudest hype moments. |
+| `credit_streamer` | `true` | `twitch.tv/name` under the headline and a clip link in the description. |
+| `headline` | `true` | Burns the video title in at the top of the Short. |
+| `headline_font` | `"luckiest"` | `luckiest`, `anton`, `bangers` or `bebas`. |
+| `caption_font` | same as `headline_font` | Same choices, plus `minecraft` (needs `fonts/Monocraft.ttf`). |
+| `min_source_height` | `480` | Skip clips below this resolution. |
+| `enhance_quality` | `true` | Final mastering pass (sharpening, -14 LUFS loudness, high-quality encode). |
+
 ## 🛠️ Prerequisites
 
 - Python 3.11+

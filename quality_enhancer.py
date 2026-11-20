@@ -143,20 +143,49 @@ def _esc(path):
     return path.replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
 
 
-def _headline_filters(headline, framing, tmpdir, font_name=None):
-    """drawtext filters for a bold, outlined, shadowed headline in the top band of the frame."""
-    if not headline or "drawtext" not in _available_filters():
+def clean_credit(name):
+    """'twitch.tv/name' for the on-screen credit, or '' if the name can't be drawn."""
+    name = (name or "").strip()
+    if not name or not re.fullmatch(r"[A-Za-z0-9_]{2,25}", name):
+        return ""
+    return f"twitch.tv/{name.lower()}"
+
+
+def _credit_filter(credit, y, tmpdir):
+    font_path = os.path.join(_FONT_DIR, HEADLINE_FONTS["anton"][0])
+    if not credit or not os.path.exists(font_path):
+        return []
+    tf = os.path.join(tmpdir, "credit.txt")
+    with open(tf, "w", encoding="utf-8") as fh:
+        fh.write(credit)
+    return [
+        f"drawtext=fontfile='{_esc(font_path)}':textfile='{_esc(tf)}':fontsize=44"
+        f":fontcolor=white@0.92:borderw=3:bordercolor=black@0.85"
+        f":shadowx=2:shadowy=2:shadowcolor=black@0.5:x=(w-text_w)/2:y={y}"
+    ]
+
+
+def _headline_filters(headline, framing, tmpdir, font_name=None, credit=""):
+    """drawtext filters for a bold, outlined, shadowed headline (plus the streamer
+    credit under it) in the top band of the frame."""
+    if "drawtext" not in _available_filters():
         return []
     font_path, size, gap = _font_spec(font_name)
-    if not os.path.exists(font_path):
-        return []
-    lines, size = _wrap(headline, font_path, size)
+    lines = []
+    if headline and os.path.exists(font_path):
+        lines, size = _wrap(headline, font_path, size)
     if not lines:
-        return []
+        return _credit_filter(credit, 120, tmpdir)
     block_h = len(lines) * size + (len(lines) - 1) * gap
-    # In blur framing a 16:9 clip leaves an empty band above the gameplay
-    # (about 656px tall); centre the headline in it. In crop mode, sit near the top.
-    top = (656 - block_h) // 2 if framing == "blur" else 170
+    credit_h = 60 if credit else 0
+    if framing == "blur":
+        # A 16:9 clip leaves an empty band above the gameplay (about 656px tall).
+        top = (656 - block_h - credit_h) // 2
+    elif framing == "split":
+        # Sit on the seam between the facecam panel and the gameplay.
+        top = 640 - block_h // 2
+    else:
+        top = 170
     top = max(top, 110)  # stay clear of YouTube's top-of-screen UI
     border = max(5, size // 14)
     shadow = max(4, size // 16)
@@ -172,7 +201,7 @@ def _headline_filters(headline, framing, tmpdir, font_name=None):
             f":shadowx={shadow}:shadowy={shadow}:shadowcolor=black@0.6"
             f":x=(w-text_w)/2:y={top + i * (size + gap)}"
         )
-    return filters
+    return filters + _credit_filter(credit, top + block_h + 18, tmpdir)
 
 
 def _probe(path):
@@ -251,7 +280,8 @@ def _audio_filter(stats):
     return base + ",aresample=48000"
 
 
-def enhance_video(input_path, output_path=None, headline=None, framing="blur", headline_font=None):
+def enhance_video(input_path, output_path=None, headline=None, framing="blur", headline_font=None,
+                  credit=None):
     """
     Masters a finished Short for upload. Returns the path of the enhanced file,
     or `input_path` unchanged if anything goes wrong.
@@ -259,6 +289,8 @@ def enhance_video(input_path, output_path=None, headline=None, framing="blur", h
     headline: optional title text burned into the top of the frame.
     framing:  "blur" or "crop" (matches video_processor) - decides headline position.
     headline_font: one of HEADLINE_FONTS ("anton", "luckiest", "bangers", "bebas").
+    framing may also be "split" (facecam layout); headline then sits on the seam.
+    credit: streamer's Twitch name, shown as "twitch.tv/name" under the headline.
     """
     if not input_path or not os.path.exists(input_path):
         return input_path
@@ -271,7 +303,8 @@ def enhance_video(input_path, output_path=None, headline=None, framing="blur", h
     try:
         fps, has_audio = _probe(input_path)
         out_fps = 60 if fps >= 50 else 30
-        text_filters = _headline_filters(clean_headline(headline), framing, tmpdir, headline_font)
+        text_filters = _headline_filters(clean_headline(headline), framing, tmpdir, headline_font,
+                                         clean_credit(credit))
 
         cmd = [_ffmpeg(), "-y", "-hide_banner", "-loglevel", "error", "-i", input_path,
                "-vf", _video_filter(fps, text_filters)]
@@ -326,5 +359,6 @@ if __name__ == "__main__":
     ap.add_argument("--headline", default=None)
     ap.add_argument("--framing", default="blur")
     ap.add_argument("--font", default=None, choices=sorted(HEADLINE_FONTS))
+    ap.add_argument("--credit", default=None, help="streamer's Twitch name")
     a = ap.parse_args()
-    print(enhance_video(a.input, a.output, a.headline, a.framing, a.font))
+    print(enhance_video(a.input, a.output, a.headline, a.framing, a.font, a.credit))
