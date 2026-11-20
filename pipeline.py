@@ -12,7 +12,7 @@ from video_finder import find_videos, find_playlist_videos, mark_video_seen as m
 from downloader import download_video
 from audio_analyzer import analyze_audio
 from highlight_detector import get_highlights, get_full_clip_range
-from video_processor import process_video, process_compilation_video, get_video_duration
+from video_processor import process_video, process_compilation_video, get_video_duration, get_video_height
 from minecraft_captions import add_captions
 from quality_enhancer import enhance_video
 from metadata_generator import generate_metadata, generate_video_metadata
@@ -145,6 +145,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
     # 3. Sourcing videos
     source_config = channel.get("source_configuration", {})
     source_type = source_config.get("source_type", "twitch").lower()
+    target_games = source_config.get("target_games")
     
     # Handle RSS sources separately (news pipelines)
     if source_type == "rss":
@@ -225,6 +226,18 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 mark_youtube_seen(video['video_id'])
             continue
             
+        # 1b. Source quality gate: upscaled low-res clips look blurry on phones.
+        min_height = channel.get("min_source_height", 480)
+        src_height = get_video_height(video_path)
+        if src_height and src_height < min_height:
+            logging.info(f"[-] Source is only {src_height}p (< {min_height}p). Skipping low-quality clip.")
+            if source_type == "twitch":
+                mark_twitch_seen(video['video_id'])
+            else:
+                mark_youtube_seen(video['video_id'])
+            cleanup_disk()
+            continue
+
         # 2. Analyze Audio
         has_voice, is_silent = analyze_audio(video_path)
         mute_audio = False  # KEEP ORIGINAL AUDIO — NO MUTING, NO BGM (user request)
@@ -255,7 +268,8 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             scene['start'] if highlights and highlights[0] else 0,
             scene['end'] if highlights and highlights[0] else (scene.get('duration', 60) if isinstance(scene, dict) else 60),
             out_filename,
-            mute_original=mute_audio
+            mute_original=mute_audio,
+            framing=channel.get("framing", "blur"),
         )
 
         # Fallback: if process_video returns None/empty, copy original clip as placeholder
@@ -378,7 +392,9 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
     clips_per_video = channel.get("clips_per_video", 5)
     videos_created = 0
 
-    if videos_per_run > 0 and not abort_pipeline:
+    if videos_per_run > 0 and source_type != "twitch":
+        logging.info(f"[-] Long-form compilations need a Twitch source; '{channel_name}' uses '{source_type}'. Skipping video phase.")
+    elif videos_per_run > 0 and not abort_pipeline:
         logging.info(f"[*] Video phase: targeting {videos_per_run} long-form video(s) ({clips_per_video} clips each) for '{channel_name}'")
         
         if get_upload_count_today() >= config.MAX_UPLOADS_PER_DAY:
