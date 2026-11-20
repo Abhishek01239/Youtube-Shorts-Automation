@@ -70,7 +70,28 @@ def _available_filters():
     return _filter_cache
 
 
-FONT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts", "roboto.ttf")
+_FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts")
+
+# Bold display fonts for headlines. Pick per channel with "headline_font".
+# (font file, font size, gap between lines)
+HEADLINE_FONTS = {
+    "anton":    ("headline/Anton-Regular.ttf",       104, 14),  # tall, condensed: classic Shorts look
+    "luckiest": ("headline/LuckiestGuy-Regular.ttf",  96, 18),  # chunky, playful: gaming / Minecraft
+    "bangers":  ("headline/Bangers-Regular.ttf",     104, 12),  # comic-book energy
+    "bebas":    ("headline/BebasNeue-Regular.ttf",   118, 10),  # clean, modern
+}
+DEFAULT_HEADLINE_FONT = "luckiest"
+HEADLINE_COLORS = ["white", "0xFFD60A"]  # lines alternate white / bright yellow
+MAX_TEXT_WIDTH = 960  # px, leaves a 60px margin each side
+
+
+def _font_spec(name):
+    name = (name or DEFAULT_HEADLINE_FONT).lower()
+    rel, size, gap = HEADLINE_FONTS.get(name, HEADLINE_FONTS[DEFAULT_HEADLINE_FONT])
+    path = os.path.join(_FONT_DIR, rel)
+    if not os.path.exists(path):  # fall back to the repo's existing font
+        path, size, gap = os.path.join(_FONT_DIR, "roboto.ttf"), 80, 18
+    return path, size, gap
 
 
 def clean_headline(title, max_chars=60):
@@ -85,45 +106,70 @@ def clean_headline(title, max_chars=60):
     return text.upper()
 
 
-def _wrap(text, width=18, max_lines=3):
-    lines, line = [], ""
-    for word in text.split():
-        if line and len(line) + 1 + len(word) > width:
-            lines.append(line)
-            line = word
+def _wrap(text, font_path, size, max_lines=3):
+    """Wrap by real rendered pixel width; shrinks the font if 3 lines still don't fit."""
+    try:
+        from PIL import ImageFont
+    except ImportError:
+        ImageFont = None
+
+    while True:
+        if ImageFont:
+            font = ImageFont.truetype(font_path, size)
+            measure = lambda t: font.getlength(t)
         else:
-            line = f"{line} {word}".strip()
-    if line:
-        lines.append(line)
+            measure = lambda t: len(t) * size * 0.55
+        lines, line = [], ""
+        for word in text.split():
+            trial = f"{line} {word}".strip()
+            if line and measure(trial) > MAX_TEXT_WIDTH:
+                lines.append(line)
+                line = word
+            else:
+                line = trial
+        if line:
+            lines.append(line)
+        too_wide = any(measure(l) > MAX_TEXT_WIDTH for l in lines)
+        if (len(lines) <= max_lines and not too_wide) or size <= 56:
+            break
+        size -= 6
     if len(lines) > max_lines:
         lines = lines[:max_lines]
         lines[-1] = lines[-1].rstrip(".") + "..."
-    return lines
+    return lines, size
 
 
-def _headline_filters(headline, framing, tmpdir):
-    """drawtext filters for a centred, boxed headline in the top band of the frame."""
-    if not headline or not os.path.exists(FONT_PATH) or "drawtext" not in _available_filters():
+def _esc(path):
+    return path.replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+
+
+def _headline_filters(headline, framing, tmpdir, font_name=None):
+    """drawtext filters for a bold, outlined, shadowed headline in the top band of the frame."""
+    if not headline or "drawtext" not in _available_filters():
         return []
-    lines = _wrap(headline)
+    font_path, size, gap = _font_spec(font_name)
+    if not os.path.exists(font_path):
+        return []
+    lines, size = _wrap(headline, font_path, size)
     if not lines:
         return []
-    size, gap = 78, 22
     block_h = len(lines) * size + (len(lines) - 1) * gap
     # In blur framing a 16:9 clip leaves an empty band above the gameplay
     # (about 656px tall); centre the headline in it. In crop mode, sit near the top.
     top = (656 - block_h) // 2 if framing == "blur" else 170
-    top = max(top, 120)  # stay clear of YouTube's top-of-screen UI
-    font = FONT_PATH.replace("\\", "/").replace(":", "\\:")
+    top = max(top, 110)  # stay clear of YouTube's top-of-screen UI
+    border = max(5, size // 14)
+    shadow = max(4, size // 16)
     filters = []
     for i, line in enumerate(lines):
         tf = os.path.join(tmpdir, f"headline_{i}.txt")
         with open(tf, "w", encoding="utf-8") as fh:
             fh.write(line)
-        tf_esc = tf.replace("\\", "/").replace(":", "\\:")
         filters.append(
-            f"drawtext=fontfile='{font}':textfile='{tf_esc}':fontsize={size}:fontcolor=white"
-            f":borderw=5:bordercolor=black:box=1:boxcolor=black@0.45:boxborderw=18"
+            f"drawtext=fontfile='{_esc(font_path)}':textfile='{_esc(tf)}':fontsize={size}"
+            f":fontcolor={HEADLINE_COLORS[i % len(HEADLINE_COLORS)]}"
+            f":borderw={border}:bordercolor=black"
+            f":shadowx={shadow}:shadowy={shadow}:shadowcolor=black@0.6"
             f":x=(w-text_w)/2:y={top + i * (size + gap)}"
         )
     return filters
@@ -205,13 +251,14 @@ def _audio_filter(stats):
     return base + ",aresample=48000"
 
 
-def enhance_video(input_path, output_path=None, headline=None, framing="blur"):
+def enhance_video(input_path, output_path=None, headline=None, framing="blur", headline_font=None):
     """
     Masters a finished Short for upload. Returns the path of the enhanced file,
     or `input_path` unchanged if anything goes wrong.
 
     headline: optional title text burned into the top of the frame.
     framing:  "blur" or "crop" (matches video_processor) - decides headline position.
+    headline_font: one of HEADLINE_FONTS ("anton", "luckiest", "bangers", "bebas").
     """
     if not input_path or not os.path.exists(input_path):
         return input_path
@@ -224,7 +271,7 @@ def enhance_video(input_path, output_path=None, headline=None, framing="blur"):
     try:
         fps, has_audio = _probe(input_path)
         out_fps = 60 if fps >= 50 else 30
-        text_filters = _headline_filters(clean_headline(headline), framing, tmpdir)
+        text_filters = _headline_filters(clean_headline(headline), framing, tmpdir, headline_font)
 
         cmd = [_ffmpeg(), "-y", "-hide_banner", "-loglevel", "error", "-i", input_path,
                "-vf", _video_filter(fps, text_filters)]
@@ -278,5 +325,6 @@ if __name__ == "__main__":
     ap.add_argument("output", nargs="?")
     ap.add_argument("--headline", default=None)
     ap.add_argument("--framing", default="blur")
+    ap.add_argument("--font", default=None, choices=sorted(HEADLINE_FONTS))
     a = ap.parse_args()
-    print(enhance_video(a.input, a.output, a.headline, a.framing))
+    print(enhance_video(a.input, a.output, a.headline, a.framing, a.font))

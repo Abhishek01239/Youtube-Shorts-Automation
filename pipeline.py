@@ -323,6 +323,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 processed_path, enhanced_path,
                 headline=metadata.get("title") if channel.get("headline", True) else None,
                 framing=channel.get("framing", "blur"),
+                headline_font=channel.get("headline_font"),
             )
 
         # 7. Calculate Scheduled Publish Time
