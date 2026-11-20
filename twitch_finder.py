@@ -103,7 +103,9 @@ def _collect_unseen(clips, seen, candidates, game_name):
             "url": clip.get("url"),
             "thumbnail_url": clip.get("thumbnail_url"),
             "game_name": game_name,
-            "duration": clip.get("duration", 30)
+            "duration": clip.get("duration", 30),
+            "broadcaster_name": clip.get("broadcaster_name", ""),
+            "view_count": clip.get("view_count"),
         })
 
 

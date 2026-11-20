@@ -20,8 +20,18 @@ import sys
 import tempfile
 from pathlib import Path
 
-FONT_NAME = "Monocraft"
-FONT_DIR = Path(__file__).parent / "fonts"
+# Caption fonts: key -> (font family name as libass sees it, folder, size multiplier).
+# The same keys as the headline fonts in quality_enhancer.py, so a channel can
+# match its captions to its headline. "minecraft" needs Monocraft.ttf in ./fonts.
+_ROOT = Path(__file__).parent
+CAPTION_FONTS = {
+    "luckiest":  ("Luckiest Guy", _ROOT / "assets" / "fonts" / "headline", 1.00),
+    "anton":     ("Anton",        _ROOT / "assets" / "fonts" / "headline", 1.15),
+    "bangers":   ("Bangers",      _ROOT / "assets" / "fonts" / "headline", 1.15),
+    "bebas":     ("Bebas Neue",   _ROOT / "assets" / "fonts" / "headline", 1.25),
+    "minecraft": ("Monocraft",    _ROOT / "fonts",                         1.00),
+}
+DEFAULT_CAPTION_FONT = "luckiest"
 WHISPER_MODEL = "small"
 WORDS_PER_CAPTION = 3
 MAX_CHARS = 16
@@ -44,10 +54,15 @@ def probe_size(video):
     return int(s["width"]), int(s["height"])
 
 
-def transcribe(video, language=None):
-    from faster_whisper import WhisperModel
+_MODEL = None
 
-    model = WhisperModel(WHISPER_MODEL, device="auto", compute_type="auto")
+
+def transcribe(video, language=None):
+    global _MODEL
+    if _MODEL is None:  # load once per run, not once per clip
+        from faster_whisper import WhisperModel
+        _MODEL = WhisperModel(WHISPER_MODEL, device="auto", compute_type="auto")
+    model = _MODEL
     segments, _ = model.transcribe(
         str(video), word_timestamps=True, vad_filter=True, language=language
     )
@@ -107,10 +122,10 @@ def clean(text):
     return text.strip(",.;:").upper()
 
 
-def build_ass(chunks, width, height):
+def build_ass(chunks, width, height, font_name="Luckiest Guy", scale=1.0):
     ref = min(width, height * 9 / 16)
-    size = int(ref * 0.075)
-    outline = max(2, int(size * 0.06))
+    size = int(ref * 0.09 * scale)
+    outline = max(3, int(size * 0.08))
     shadow = max(3, int(size * 0.09))
     margin_v = int(height * BOTTOM_MARGIN)
 
@@ -125,7 +140,7 @@ def build_ass(chunks, width, height):
         "Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,"
         "Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,"
         "Alignment,MarginL,MarginR,MarginV,Encoding",
-        f"Style: Default,{FONT_NAME},{size},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
+        f"Style: Default,{font_name},{size},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
         f"0,0,0,0,100,100,0,0,1,{outline},{shadow},2,40,40,{margin_v},1",
         "",
         "[Events]",
@@ -154,7 +169,9 @@ def build_ass(chunks, width, height):
     return "\n".join(lines) + "\n"
 
 
-def add_captions(input_path, output_path=None, language=None):
+def add_captions(input_path, output_path=None, language=None, font=None, words=None):
+    """words: optional pre-computed (start, end, text) list on this video's timeline;
+    skips the Whisper pass when given."""
     input_path = Path(input_path).resolve()
     output_path = (
         Path(output_path).resolve()
@@ -163,14 +180,21 @@ def add_captions(input_path, output_path=None, language=None):
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    words = transcribe(input_path, language)
+    if words is None:
+        words = transcribe(input_path, language)
     if not words:
         print("[captions] no speech detected, passing video through unchanged")
         shutil.copy(input_path, output_path)
         return str(output_path)
 
+    key = (font or DEFAULT_CAPTION_FONT).lower()
+    if key not in CAPTION_FONTS:
+        print(f"[captions] unknown font '{font}', using '{DEFAULT_CAPTION_FONT}'")
+        key = DEFAULT_CAPTION_FONT
+    font_name, font_dir, scale = CAPTION_FONTS[key]
+
     width, height = probe_size(input_path)
-    ass = build_ass(chunk_words(words), width, height)
+    ass = build_ass(chunk_words(words), width, height, font_name, scale)
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -178,9 +202,9 @@ def add_captions(input_path, output_path=None, language=None):
 
         fonts = tmp / "fonts"
         fonts.mkdir()
-        found = [f for f in FONT_DIR.glob("*") if f.suffix.lower() in (".ttf", ".otf")]
+        found = [f for f in font_dir.glob("*") if f.suffix.lower() in (".ttf", ".otf")]
         if not found:
-            print(f"[captions] WARNING: no font in {FONT_DIR}, falling back to a system font")
+            print(f"[captions] WARNING: no font in {font_dir}, falling back to a system font")
         for f in found:
             shutil.copy(f, fonts / f.name)
 
@@ -205,5 +229,6 @@ if __name__ == "__main__":
     ap.add_argument("input")
     ap.add_argument("output", nargs="?")
     ap.add_argument("--lang", default=None)
+    ap.add_argument("--font", default=None, choices=sorted(CAPTION_FONTS))
     a = ap.parse_args()
-    print(add_captions(a.input, a.output, a.lang))
+    print(add_captions(a.input, a.output, a.lang, a.font))

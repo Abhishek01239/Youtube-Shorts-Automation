@@ -15,6 +15,8 @@ from highlight_detector import get_highlights, get_full_clip_range
 from video_processor import process_video, process_compilation_video, get_video_duration, get_video_height
 from minecraft_captions import add_captions
 from quality_enhancer import enhance_video
+from smart_editing import (short_window, transcribe_for_short, score_clip,
+                           find_hype_moments, zoom_expressions, detect_facecam)
 from metadata_generator import generate_metadata, generate_video_metadata
 from youtube_uploader import upload_short, upload_video, get_upload_count_today
 from facebook_uploader import upload_fb_video
@@ -260,16 +262,58 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             continue
             
         scene = highlights[0]
-        
+        clip_start, raw_dur = short_window(scene['start'], scene['end'])
+
+        # 3b. One Whisper pass on the raw clip: feeds the AI picker AND the captions.
+        caption_words, transcript = transcribe_for_short(video_path, clip_start, raw_dur)
+
+        # 3c. AI clip picker: skip clips Groq rates below the channel's bar.
+        # Fails open (no key / API error -> clip is kept).
+        min_score = channel.get("min_clip_score", 5)
+        if min_score:
+            score, reason = score_clip(
+                video['title'], transcript, game=video.get("game_name", ""),
+                views=video.get("view_count"), niche=niche,
+            )
+            if score is not None:
+                logging.info(f"[AI picker] {score}/10 - {reason}")
+                if score < min_score:
+                    logging.info(f"[-] Below min_clip_score ({min_score}). Skipping clip.")
+                    if source_type == "twitch":
+                        mark_twitch_seen(video['video_id'])
+                    else:
+                        mark_youtube_seen(video['video_id'])
+                    cleanup_disk()
+                    continue
+
+        # 3d. Layout: "auto" uses the facecam split layout when a facecam is found,
+        # otherwise the blurred full-frame look.
+        framing = channel.get("framing", "auto")
+        facecam = None
+        if framing in ("auto", "split"):
+            facecam = detect_facecam(video_path, clip_start, raw_dur)
+            framing = "split" if facecam else "blur"
+        logging.info(f"[*] Layout: {framing}")
+
+        # 3e. Zoom punch-ins on the loudest hype moments.
+        zoom = None
+        if channel.get("punch_ins", True):
+            peaks = find_hype_moments(video_path, clip_start, raw_dur)
+            zoom = zoom_expressions(peaks)
+            if peaks:
+                logging.info(f"[*] Punch-ins at {peaks} s")
+
         # 4. Process into YouTube Short (9:16 vertical 1080p) — defensive fallback
         out_filename = f"short_{video['video_id']}.mp4"
         processed_path = process_video(
             video_path,
-            scene['start'] if highlights and highlights[0] else 0,
-            scene['end'] if highlights and highlights[0] else (scene.get('duration', 60) if isinstance(scene, dict) else 60),
+            scene['start'],
+            scene['end'],
             out_filename,
             mute_original=mute_audio,
-            framing=channel.get("framing", "blur"),
+            framing=framing,
+            facecam=facecam,
+            zoom=zoom,
         )
 
         # Fallback: if process_video returns None/empty, copy original clip as placeholder
@@ -296,7 +340,11 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         # already-processed 9:16 Short before it reaches the uploader.
         captioned_path = os.path.join(config.get_processed_dir(), f"captioned_{video['video_id']}.mp4")
         try:
-            processed_path = add_captions(processed_path, captioned_path)
+            processed_path = add_captions(
+                processed_path, captioned_path,
+                font=channel.get("caption_font") or channel.get("headline_font"),
+                words=caption_words,
+            )
             if not processed_path or not os.path.exists(processed_path):
                 raise RuntimeError("Caption generator returned no output file")
             logging.info(f"[+] Auto captions added: {processed_path}")
@@ -313,13 +361,27 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         # normalisation (-14 LUFS) and a high-quality upload encode.
         # Never blocks the upload — falls back to the captioned file on failure.
         # Disable per channel with "enhance_quality": false in channels.json.
+        # 6. Metadata Generation (Pass the dynamic Niche parameter!)
+        # Generated before mastering so the title can be burned in as a headline.
+        metadata = generate_metadata(video['title'], niche=niche)
+
+        # Credit the streamer in the description (and on screen, below).
+        streamer = (video.get("broadcaster_name") or "").strip()
+        if streamer and channel.get("credit_streamer", True):
+            link = video.get("url") or f"https://twitch.tv/{streamer.lower()}"
+            credit_line = f"🎥 Clip by {streamer} on Twitch: {link}"
+            metadata["description"] = f"{credit_line}\n\n{metadata.get('description', '')}"
+
         if channel.get("enhance_quality", True):
             enhanced_path = os.path.join(config.get_processed_dir(), f"final_{video['video_id']}.mp4")
-            processed_path = enhance_video(processed_path, enhanced_path)
+            processed_path = enhance_video(
+                processed_path, enhanced_path,
+                headline=metadata.get("title") if channel.get("headline", True) else None,
+                framing=framing,
+                headline_font=channel.get("headline_font"),
+                credit=streamer if channel.get("credit_streamer", True) else None,
+            )
 
-        # 6. Metadata Generation (Pass the dynamic Niche parameter!)
-        metadata = generate_metadata(video['title'], niche=niche)
-        
         # 7. Calculate Scheduled Publish Time
         scheduled_time = base_publish_time + timedelta(hours=uploaded_count * interval_hours)
         

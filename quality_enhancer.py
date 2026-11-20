@@ -8,6 +8,7 @@ What it does:
     - Contrast-adaptive sharpening (CAS) - crisper edges without the halo look
       of a second unsharp pass
     - Keeps 60fps if the source is >= 50fps, otherwise locks to a clean 30fps
+    - Optional headline (the video title) in the empty band above the gameplay
     - Tags BT.709 colour so YouTube doesn't wash out the colours
   Audio
     - High-pass at 70 Hz to drop mic rumble / desk thumps
@@ -27,6 +28,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 
 import config
 
@@ -68,6 +70,140 @@ def _available_filters():
     return _filter_cache
 
 
+_FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts")
+
+# Bold display fonts for headlines. Pick per channel with "headline_font".
+# (font file, font size, gap between lines)
+HEADLINE_FONTS = {
+    "anton":    ("headline/Anton-Regular.ttf",       104, 14),  # tall, condensed: classic Shorts look
+    "luckiest": ("headline/LuckiestGuy-Regular.ttf",  96, 18),  # chunky, playful: gaming / Minecraft
+    "bangers":  ("headline/Bangers-Regular.ttf",     104, 12),  # comic-book energy
+    "bebas":    ("headline/BebasNeue-Regular.ttf",   118, 10),  # clean, modern
+}
+DEFAULT_HEADLINE_FONT = "luckiest"
+HEADLINE_COLORS = ["white", "0xFFD60A"]  # lines alternate white / bright yellow
+MAX_TEXT_WIDTH = 960  # px, leaves a 60px margin each side
+
+
+def _font_spec(name):
+    name = (name or DEFAULT_HEADLINE_FONT).lower()
+    rel, size, gap = HEADLINE_FONTS.get(name, HEADLINE_FONTS[DEFAULT_HEADLINE_FONT])
+    path = os.path.join(_FONT_DIR, rel)
+    if not os.path.exists(path):  # fall back to the repo's existing font
+        path, size, gap = os.path.join(_FONT_DIR, "roboto.ttf"), 80, 18
+    return path, size, gap
+
+
+def clean_headline(title, max_chars=60):
+    """Strip hashtags/emojis (the font can't draw emojis) and tidy a title for on-screen use."""
+    if not title:
+        return ""
+    text = re.sub(r"#\w+", "", title)
+    text = "".join(ch for ch in text if ord(ch) < 0x2000 or 0x2010 <= ord(ch) <= 0x203A)
+    text = re.sub(r"\s+", " ", text).strip(" -|:,")
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit(" ", 1)[0].rstrip(" -|:,") + "..."
+    return text.upper()
+
+
+def _wrap(text, font_path, size, max_lines=3):
+    """Wrap by real rendered pixel width; shrinks the font if 3 lines still don't fit."""
+    try:
+        from PIL import ImageFont
+    except ImportError:
+        ImageFont = None
+
+    while True:
+        if ImageFont:
+            font = ImageFont.truetype(font_path, size)
+            measure = lambda t: font.getlength(t)
+        else:
+            measure = lambda t: len(t) * size * 0.55
+        lines, line = [], ""
+        for word in text.split():
+            trial = f"{line} {word}".strip()
+            if line and measure(trial) > MAX_TEXT_WIDTH:
+                lines.append(line)
+                line = word
+            else:
+                line = trial
+        if line:
+            lines.append(line)
+        too_wide = any(measure(l) > MAX_TEXT_WIDTH for l in lines)
+        if (len(lines) <= max_lines and not too_wide) or size <= 56:
+            break
+        size -= 6
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1].rstrip(".") + "..."
+    return lines, size
+
+
+def _esc(path):
+    return path.replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+
+
+def clean_credit(name):
+    """'twitch.tv/name' for the on-screen credit, or '' if the name can't be drawn."""
+    name = (name or "").strip()
+    if not name or not re.fullmatch(r"[A-Za-z0-9_]{2,25}", name):
+        return ""
+    return f"twitch.tv/{name.lower()}"
+
+
+def _credit_filter(credit, y, tmpdir):
+    font_path = os.path.join(_FONT_DIR, HEADLINE_FONTS["anton"][0])
+    if not credit or not os.path.exists(font_path):
+        return []
+    tf = os.path.join(tmpdir, "credit.txt")
+    with open(tf, "w", encoding="utf-8") as fh:
+        fh.write(credit)
+    return [
+        f"drawtext=fontfile='{_esc(font_path)}':textfile='{_esc(tf)}':fontsize=44"
+        f":fontcolor=white@0.92:borderw=3:bordercolor=black@0.85"
+        f":shadowx=2:shadowy=2:shadowcolor=black@0.5:x=(w-text_w)/2:y={y}"
+    ]
+
+
+def _headline_filters(headline, framing, tmpdir, font_name=None, credit=""):
+    """drawtext filters for a bold, outlined, shadowed headline (plus the streamer
+    credit under it) in the top band of the frame."""
+    if "drawtext" not in _available_filters():
+        return []
+    font_path, size, gap = _font_spec(font_name)
+    lines = []
+    if headline and os.path.exists(font_path):
+        lines, size = _wrap(headline, font_path, size)
+    if not lines:
+        return _credit_filter(credit, 120, tmpdir)
+    block_h = len(lines) * size + (len(lines) - 1) * gap
+    credit_h = 60 if credit else 0
+    if framing == "blur":
+        # A 16:9 clip leaves an empty band above the gameplay (about 656px tall).
+        top = (656 - block_h - credit_h) // 2
+    elif framing == "split":
+        # Sit on the seam between the facecam panel and the gameplay.
+        top = 640 - block_h // 2
+    else:
+        top = 170
+    top = max(top, 110)  # stay clear of YouTube's top-of-screen UI
+    border = max(5, size // 14)
+    shadow = max(4, size // 16)
+    filters = []
+    for i, line in enumerate(lines):
+        tf = os.path.join(tmpdir, f"headline_{i}.txt")
+        with open(tf, "w", encoding="utf-8") as fh:
+            fh.write(line)
+        filters.append(
+            f"drawtext=fontfile='{_esc(font_path)}':textfile='{_esc(tf)}':fontsize={size}"
+            f":fontcolor={HEADLINE_COLORS[i % len(HEADLINE_COLORS)]}"
+            f":borderw={border}:bordercolor=black"
+            f":shadowx={shadow}:shadowy={shadow}:shadowcolor=black@0.6"
+            f":x=(w-text_w)/2:y={top + i * (size + gap)}"
+        )
+    return filters + _credit_filter(credit, top + block_h + 18, tmpdir)
+
+
 def _probe(path):
     """Returns (fps, has_audio)."""
     out = subprocess.run(
@@ -90,7 +226,7 @@ def _probe(path):
     return fps, has_audio
 
 
-def _video_filter(fps):
+def _video_filter(fps, extra=()):
     f = _available_filters()
     chain = [
         f"scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=increase:flags=lanczos",
@@ -105,6 +241,7 @@ def _video_filter(fps):
         chain.append("cas=strength=0.45")
     else:
         chain.append("unsharp=3:3:0.4:3:3:0.0")
+    chain.extend(extra)
     chain.append(f"fps={60 if fps >= 50 else 30}")
     chain.append("format=yuv420p")
     return ",".join(chain)
@@ -143,10 +280,17 @@ def _audio_filter(stats):
     return base + ",aresample=48000"
 
 
-def enhance_video(input_path, output_path=None):
+def enhance_video(input_path, output_path=None, headline=None, framing="blur", headline_font=None,
+                  credit=None):
     """
     Masters a finished Short for upload. Returns the path of the enhanced file,
     or `input_path` unchanged if anything goes wrong.
+
+    headline: optional title text burned into the top of the frame.
+    framing:  "blur" or "crop" (matches video_processor) - decides headline position.
+    headline_font: one of HEADLINE_FONTS ("anton", "luckiest", "bangers", "bebas").
+    framing may also be "split" (facecam layout); headline then sits on the seam.
+    credit: streamer's Twitch name, shown as "twitch.tv/name" under the headline.
     """
     if not input_path or not os.path.exists(input_path):
         return input_path
@@ -155,12 +299,15 @@ def enhance_video(input_path, output_path=None):
         root, _ = os.path.splitext(input_path)
         output_path = f"{root}_hq.mp4"
 
+    tmpdir = tempfile.mkdtemp(prefix="quality_")
     try:
         fps, has_audio = _probe(input_path)
         out_fps = 60 if fps >= 50 else 30
+        text_filters = _headline_filters(clean_headline(headline), framing, tmpdir, headline_font,
+                                         clean_credit(credit))
 
         cmd = [_ffmpeg(), "-y", "-hide_banner", "-loglevel", "error", "-i", input_path,
-               "-vf", _video_filter(fps)]
+               "-vf", _video_filter(fps, text_filters)]
 
         if has_audio:
             stats = _measure_loudness(input_path)
@@ -198,6 +345,8 @@ def enhance_video(input_path, output_path=None):
         logging.warning(f"[quality] ffmpeg failed, uploading un-enhanced video: {(e.stderr or '')[-800:]}")
     except Exception as e:
         logging.warning(f"[quality] Enhancement skipped, uploading un-enhanced video: {e}")
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
     return input_path
 
 
@@ -207,5 +356,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Master a Short for upload (quality pass)")
     ap.add_argument("input")
     ap.add_argument("output", nargs="?")
+    ap.add_argument("--headline", default=None)
+    ap.add_argument("--framing", default="blur")
+    ap.add_argument("--font", default=None, choices=sorted(HEADLINE_FONTS))
+    ap.add_argument("--credit", default=None, help="streamer's Twitch name")
     a = ap.parse_args()
-    print(enhance_video(a.input, a.output))
+    print(enhance_video(a.input, a.output, a.headline, a.framing, a.font, a.credit))
