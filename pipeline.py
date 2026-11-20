@@ -296,7 +296,10 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         # already-processed 9:16 Short before it reaches the uploader.
         captioned_path = os.path.join(config.get_processed_dir(), f"captioned_{video['video_id']}.mp4")
         try:
-            processed_path = add_captions(processed_path, captioned_path)
+            processed_path = add_captions(
+                processed_path, captioned_path,
+                font=channel.get("caption_font") or channel.get("headline_font"),
+            )
             if not processed_path or not os.path.exists(processed_path):
                 raise RuntimeError("Caption generator returned no output file")
             logging.info(f"[+] Auto captions added: {processed_path}")
