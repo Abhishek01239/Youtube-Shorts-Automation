@@ -313,13 +313,18 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         # normalisation (-14 LUFS) and a high-quality upload encode.
         # Never blocks the upload — falls back to the captioned file on failure.
         # Disable per channel with "enhance_quality": false in channels.json.
+        # 6. Metadata Generation (Pass the dynamic Niche parameter!)
+        # Generated before mastering so the title can be burned in as a headline.
+        metadata = generate_metadata(video['title'], niche=niche)
+
         if channel.get("enhance_quality", True):
             enhanced_path = os.path.join(config.get_processed_dir(), f"final_{video['video_id']}.mp4")
-            processed_path = enhance_video(processed_path, enhanced_path)
+            processed_path = enhance_video(
+                processed_path, enhanced_path,
+                headline=metadata.get("title") if channel.get("headline", True) else None,
+                framing=channel.get("framing", "blur"),
+            )
 
-        # 6. Metadata Generation (Pass the dynamic Niche parameter!)
-        metadata = generate_metadata(video['title'], niche=niche)
-        
         # 7. Calculate Scheduled Publish Time
         scheduled_time = base_publish_time + timedelta(hours=uploaded_count * interval_hours)
         

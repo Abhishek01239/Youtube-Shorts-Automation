@@ -8,6 +8,7 @@ What it does:
     - Contrast-adaptive sharpening (CAS) - crisper edges without the halo look
       of a second unsharp pass
     - Keeps 60fps if the source is >= 50fps, otherwise locks to a clean 30fps
+    - Optional headline (the video title) in the empty band above the gameplay
     - Tags BT.709 colour so YouTube doesn't wash out the colours
   Audio
     - High-pass at 70 Hz to drop mic rumble / desk thumps
@@ -27,6 +28,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 
 import config
 
@@ -68,6 +70,65 @@ def _available_filters():
     return _filter_cache
 
 
+FONT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts", "roboto.ttf")
+
+
+def clean_headline(title, max_chars=60):
+    """Strip hashtags/emojis (the font can't draw emojis) and tidy a title for on-screen use."""
+    if not title:
+        return ""
+    text = re.sub(r"#\w+", "", title)
+    text = "".join(ch for ch in text if ord(ch) < 0x2000 or 0x2010 <= ord(ch) <= 0x203A)
+    text = re.sub(r"\s+", " ", text).strip(" -|:,")
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit(" ", 1)[0].rstrip(" -|:,") + "..."
+    return text.upper()
+
+
+def _wrap(text, width=18, max_lines=3):
+    lines, line = [], ""
+    for word in text.split():
+        if line and len(line) + 1 + len(word) > width:
+            lines.append(line)
+            line = word
+        else:
+            line = f"{line} {word}".strip()
+    if line:
+        lines.append(line)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1].rstrip(".") + "..."
+    return lines
+
+
+def _headline_filters(headline, framing, tmpdir):
+    """drawtext filters for a centred, boxed headline in the top band of the frame."""
+    if not headline or not os.path.exists(FONT_PATH) or "drawtext" not in _available_filters():
+        return []
+    lines = _wrap(headline)
+    if not lines:
+        return []
+    size, gap = 78, 22
+    block_h = len(lines) * size + (len(lines) - 1) * gap
+    # In blur framing a 16:9 clip leaves an empty band above the gameplay
+    # (about 656px tall); centre the headline in it. In crop mode, sit near the top.
+    top = (656 - block_h) // 2 if framing == "blur" else 170
+    top = max(top, 120)  # stay clear of YouTube's top-of-screen UI
+    font = FONT_PATH.replace("\\", "/").replace(":", "\\:")
+    filters = []
+    for i, line in enumerate(lines):
+        tf = os.path.join(tmpdir, f"headline_{i}.txt")
+        with open(tf, "w", encoding="utf-8") as fh:
+            fh.write(line)
+        tf_esc = tf.replace("\\", "/").replace(":", "\\:")
+        filters.append(
+            f"drawtext=fontfile='{font}':textfile='{tf_esc}':fontsize={size}:fontcolor=white"
+            f":borderw=5:bordercolor=black:box=1:boxcolor=black@0.45:boxborderw=18"
+            f":x=(w-text_w)/2:y={top + i * (size + gap)}"
+        )
+    return filters
+
+
 def _probe(path):
     """Returns (fps, has_audio)."""
     out = subprocess.run(
@@ -90,7 +151,7 @@ def _probe(path):
     return fps, has_audio
 
 
-def _video_filter(fps):
+def _video_filter(fps, extra=()):
     f = _available_filters()
     chain = [
         f"scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=increase:flags=lanczos",
@@ -105,6 +166,7 @@ def _video_filter(fps):
         chain.append("cas=strength=0.45")
     else:
         chain.append("unsharp=3:3:0.4:3:3:0.0")
+    chain.extend(extra)
     chain.append(f"fps={60 if fps >= 50 else 30}")
     chain.append("format=yuv420p")
     return ",".join(chain)
@@ -143,10 +205,13 @@ def _audio_filter(stats):
     return base + ",aresample=48000"
 
 
-def enhance_video(input_path, output_path=None):
+def enhance_video(input_path, output_path=None, headline=None, framing="blur"):
     """
     Masters a finished Short for upload. Returns the path of the enhanced file,
     or `input_path` unchanged if anything goes wrong.
+
+    headline: optional title text burned into the top of the frame.
+    framing:  "blur" or "crop" (matches video_processor) - decides headline position.
     """
     if not input_path or not os.path.exists(input_path):
         return input_path
@@ -155,12 +220,14 @@ def enhance_video(input_path, output_path=None):
         root, _ = os.path.splitext(input_path)
         output_path = f"{root}_hq.mp4"
 
+    tmpdir = tempfile.mkdtemp(prefix="quality_")
     try:
         fps, has_audio = _probe(input_path)
         out_fps = 60 if fps >= 50 else 30
+        text_filters = _headline_filters(clean_headline(headline), framing, tmpdir)
 
         cmd = [_ffmpeg(), "-y", "-hide_banner", "-loglevel", "error", "-i", input_path,
-               "-vf", _video_filter(fps)]
+               "-vf", _video_filter(fps, text_filters)]
 
         if has_audio:
             stats = _measure_loudness(input_path)
@@ -198,6 +265,8 @@ def enhance_video(input_path, output_path=None):
         logging.warning(f"[quality] ffmpeg failed, uploading un-enhanced video: {(e.stderr or '')[-800:]}")
     except Exception as e:
         logging.warning(f"[quality] Enhancement skipped, uploading un-enhanced video: {e}")
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
     return input_path
 
 
@@ -207,5 +276,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Master a Short for upload (quality pass)")
     ap.add_argument("input")
     ap.add_argument("output", nargs="?")
+    ap.add_argument("--headline", default=None)
+    ap.add_argument("--framing", default="blur")
     a = ap.parse_args()
-    print(enhance_video(a.input, a.output))
+    print(enhance_video(a.input, a.output, a.headline, a.framing))
