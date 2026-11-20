@@ -14,6 +14,7 @@ from audio_analyzer import analyze_audio
 from highlight_detector import get_highlights, get_full_clip_range
 from video_processor import process_video, process_compilation_video, get_video_duration
 from minecraft_captions import add_captions
+from quality_enhancer import enhance_video
 from metadata_generator import generate_metadata, generate_video_metadata
 from youtube_uploader import upload_short, upload_video, get_upload_count_today
 from facebook_uploader import upload_fb_video
@@ -293,6 +294,14 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 mark_youtube_seen(video['video_id'])
             cleanup_disk()
             continue
+
+        # 5b. Quality mastering pass: deband, adaptive sharpen, loudness
+        # normalisation (-14 LUFS) and a high-quality upload encode.
+        # Never blocks the upload — falls back to the captioned file on failure.
+        # Disable per channel with "enhance_quality": false in channels.json.
+        if channel.get("enhance_quality", True):
+            enhanced_path = os.path.join(config.get_processed_dir(), f"final_{video['video_id']}.mp4")
+            processed_path = enhance_video(processed_path, enhanced_path)
 
         # 6. Metadata Generation (Pass the dynamic Niche parameter!)
         metadata = generate_metadata(video['title'], niche=niche)

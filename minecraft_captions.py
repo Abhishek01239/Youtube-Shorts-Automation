@@ -187,7 +187,7 @@ def add_captions(input_path, output_path=None, language=None):
         cmd = [
             "ffmpeg", "-y", "-i", str(input_path),
             "-vf", "subtitles=captions.ass:fontsdir=fonts",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "15",
             "-pix_fmt", "yuv420p", "-c:a", "copy", str(output_path),
         ]
         try:
