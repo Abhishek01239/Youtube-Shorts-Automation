@@ -62,7 +62,7 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
         "vcodec": "libx264",
         "acodec": "aac",
         "preset": "fast",
-        "crf": 20,
+        "crf": 15,  # near-lossless intermediate; quality_enhancer does the final encode
         "pix_fmt": "yuv420p",
         "movflags": "+faststart",
         "strict": "experimental",
