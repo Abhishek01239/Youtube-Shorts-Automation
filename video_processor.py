@@ -17,7 +17,38 @@ def get_font_path():
     if not files: return None
     return os.path.join(config.FONTS_DIR, files[0])
 
-def process_video(video_path, start, end, output_filename, mute_original=False):
+def _frame_vertical(video, framing="blur"):
+    """
+    Turns any input into a 1080x1920 vertical frame.
+
+    framing="crop": scale to 1920 tall and cut out the centre (old behaviour;
+                    loses ~2/3 of a 16:9 frame, including corner facecams/HUD).
+    framing="blur": show the WHOLE frame, full width, over a blurred, dimmed,
+                    zoomed copy of itself filling the rest of the screen.
+    """
+    if framing == "crop":
+        v = video.filter("scale", -1, 1920, flags="lanczos")
+        return v.filter("crop", w=1080, h=1920, x="(in_w-1080)/2", y=0)
+
+    parts = video.filter_multi_output("split")
+    # Background: blur at quarter resolution (much faster), then scale back up.
+    bg = (
+        parts[0]
+        .filter("scale", 270, 480, force_original_aspect_ratio="increase")
+        .filter("crop", 270, 480)
+        .filter("boxblur", luma_radius=12, luma_power=2)
+        .filter("eq", brightness=-0.10, saturation=1.15)
+        .filter("scale", 1080, 1920, flags="bicubic")
+    )
+    # Foreground: entire original frame, as large as fits.
+    fg = parts[1].filter(
+        "scale", 1080, 1920, force_original_aspect_ratio="decrease", flags="lanczos"
+    )
+    v = ffmpeg.overlay(bg, fg, x="(W-w)/2", y="(H-h)/2")
+    return v.filter("setsar", 1)
+
+
+def process_video(video_path, start, end, output_filename, mute_original=False, framing="blur"):
     """
     Processes a landscape gameplay video into a high-quality YouTube Short.
     Guarantees strict duration <= 45s for YouTube Shorts compliance.
@@ -36,11 +67,8 @@ def process_video(video_path, start, end, output_filename, mute_original=False):
     video = stream.video
     audio = stream.audio
     
-    # 1. Scale down to 1920 height
-    v = video.filter("scale", -1, 1920, flags="lanczos")
-    
-    # 2. Crop center to 9:16 (1080x1920)
-    v = v.filter("crop", w=1080, h=1920, x="(in_w-1080)/2", y=0)
+    # 1-2. Fit into a 9:16 (1080x1920) frame: blurred-background fill or centre crop
+    v = _frame_vertical(video, framing)
     
     # 3. Speed up video to 1.2x
     v = v.filter("setpts", "0.833333*PTS")
@@ -285,3 +313,19 @@ def process_compilation_video(clip_segments, output_filename, max_duration=2400,
                     os.unlink(p)
             except Exception:
                 pass
+
+
+def get_video_height(video_path):
+    """Pixel height of the first video stream, or None if it can't be read."""
+    probe = shutil.which("ffprobe") or os.path.join(
+        os.path.dirname(config.get_ffmpeg_path()), "ffprobe"
+    )
+    try:
+        out = subprocess.run(
+            [probe, "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=height", "-of", "csv=p=0", video_path],
+            capture_output=True, text=True, timeout=30,
+        ).stdout.strip()
+        return int(out.splitlines()[0]) if out else None
+    except Exception:
+        return None
