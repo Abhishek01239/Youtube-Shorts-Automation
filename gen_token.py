@@ -8,7 +8,7 @@ Usage:
 What happens:
     1. Reads client_secret.json (root of this repo, gitignored).
     2. Opens your browser -> login with the Google/YouTube account that OWNS
-       that channel -> approve the upload scope.
+       that channel -> approve the upload + read-only analytics scopes.
     3. Writes data/channels/<CHANNEL_NAME>/token.json
     4. Prints the JSON content so you can paste it into the GitHub secret
        YOUTUBE_TOKEN_JSON_<CHANNEL_NAME>  (or upload the file yourself).
@@ -26,7 +26,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 os.chdir(BASE_DIR)
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    # Read-only analytics: lets rl/update_rewards.py read each Short's retention
+    # (average % watched) to teach the editing bandit. Cannot change anything.
+    # Needs "YouTube Analytics API" enabled in the Google Cloud project.
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("Usage:")[0])

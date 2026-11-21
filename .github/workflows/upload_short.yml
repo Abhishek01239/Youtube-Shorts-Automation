@@ -47,6 +47,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Score past Shorts & update editing bandit (RL) for ${{ matrix.channel }}
+        continue-on-error: true
+        env:
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
+          # Channel dynamic tokens passed as environment variables:
+          YOUTUBE_TOKEN_JSON_EXISTINGCHANNEL: ${{ secrets.YOUTUBE_TOKEN_JSON_EXISTINGCHANNEL }}
+          YOUTUBE_TOKEN_JSON_EXAMPLEGAMINGCHANNEL: ${{ secrets.YOUTUBE_TOKEN_JSON_EXAMPLEGAMINGCHANNEL }}
+          YOUTUBE_TOKEN_JSON_GAMES: ${{ secrets.YOUTUBE_TOKEN_JSON_GAMES }}
+          YOUTUBE_TOKEN_JSON_MINECRAFTSHORTS: ${{ secrets.YOUTUBE_TOKEN_JSON_MINECRAFTSHORTS }}
+          YOUTUBE_TOKEN_JSON_MINECRAFTSHORTS2: ${{ secrets.YOUTUBE_TOKEN_JSON_MINECRAFTSHORTS2 }}
+          # Facebook Page (Graph API) credentials for the FacebookGaming channel:
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          # Notification Configuration Secrets
+          NOTIFICATION_PROVIDER: ${{ secrets.NOTIFICATION_PROVIDER }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_FROM_NUMBER: ${{ secrets.TWILIO_FROM_NUMBER }}
+          USER_PHONE_NUMBER: ${{ secrets.USER_PHONE_NUMBER }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python -m rl.update_rewards --channels channels.json --channel "${{ matrix.channel }}"
+
       - name: Execute Shorts + Video Generation for ${{ matrix.channel }}
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
@@ -80,7 +108,7 @@ jobs:
           git config user.email "actions@github.com"
           git config user.name "github-actions[bot]"
           for i in 1 2 3 4 5; do
-            find data/channels -type f \( -name "seen_videos.txt" -o -name "upload_log.json" \) -exec git add {} +
+            find data/channels -type f \( -name "seen_videos.txt" -o -name "upload_log.json" -o -name "rl_state.json" -o -name "rl_log.json" \) -exec git add {} +
             if git diff --cached --quiet; then
               echo "No history changes for ${{ matrix.channel }}"
               break
