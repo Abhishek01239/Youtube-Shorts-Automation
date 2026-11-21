@@ -23,7 +23,7 @@ Every Short goes through: AI clip picker → layout → zoom punch-ins → capti
 
 | Key | Default | What it does |
 |---|---|---|
-| `min_clip_score` | `5` | AI clip picker: Groq rates each clip 1-10 from its transcript, title and views; lower scores are skipped. `0` disables. Needs `GROQ_API_KEY` (clips are kept if scoring fails). |
+| `min_clip_score` | `4` | AI clip picker: Groq rates each clip 1-10 from its speech, title and views; lower scores are skipped. The bar drops by 1 after every 3 rejections in a run, so a channel never runs dry. `0` disables. Needs `GROQ_API_KEY` (clips are kept if scoring fails). |
 | `framing` | `"auto"` | `"auto"`: facecam split layout if a streamer facecam is found, else `"blur"`. `"split"`, `"blur"` (full frame over a blurred background) or `"crop"` (old centre crop). |
 | `punch_ins` | `true` | Quick zoom + shake on the loudest hype moments. |
 | `credit_streamer` | `true` | `twitch.tv/name` under the headline and a clip link in the description. |

@@ -72,20 +72,31 @@ def score_clip(title, transcript, game="", views=None, niche="gaming"):
         from metadata_generator import _available_chat_models, _extract_json
 
         transcript = (transcript or "").strip()[:1500] or "(no speech: gameplay audio only)"
-        prompt = f"""You pick clips for a YouTube Shorts channel about "{niche}".
-Rate this Twitch clip from 1 to 10 for how likely viewers are to watch it to the end.
+        prompt = f"""You pick Twitch clips for a YouTube Shorts channel about "{niche}".
+Rate this clip from 1 to 10 for how well it would do as a Short.
+
+IMPORTANT CONTEXT:
+- You only get the streamer's SPEECH. Viewers also SEE the gameplay and the
+  streamer's face, so never mark a clip down for "no visible gameplay/action":
+  you simply can't see it.
+- Almost every Twitch clip is casual streamer talk, reactions and swearing. Judge
+  this clip against OTHER TWITCH CLIPS, not against edited videos. A typical clip
+  is a 5. Profanity alone is not a reason for a low score.
+- Twitch views show how many real viewers already found it worth watching:
+  thousands of views is a strong positive signal.
+- Clips with no speech are common (pure gameplay); judge those on title and views.
 
 Clip title: "{title}"
 Game: {game or "unknown"}
 Twitch views: {views if views is not None else "unknown"}
-Transcript of the clip:
+Streamer speech:
 \"\"\"{transcript}\"\"\"
 
-High scores: a clear funny, shocking, skilful or emotional moment; a strong reaction;
-a payoff a viewer can follow without context.
-Low scores: dead air, menus/loading, inside jokes that need context, mostly talking
-about nothing, ads/sponsor reads, or anything unsafe for a general audience.
-A clip with no speech can still score high if the title suggests an exciting play.
+Score 7-10: clear reaction, hype, funny line, rage, clutch, or a title that promises a payoff.
+Score 4-6: ordinary clip, nothing wrong with it.
+Score 1-3 ONLY for: an ad/sponsor read, pure dead air or menus with a dull title,
+speech that is entirely in a language other than English with nothing to follow,
+or content unsafe for a general audience (slurs, sexual content).
 
 Reply with JSON only: {{"score": <1-10 integer>, "reason": "<one short sentence>"}}"""
 
