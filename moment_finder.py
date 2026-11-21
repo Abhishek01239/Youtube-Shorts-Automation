@@ -113,14 +113,17 @@ def _speech_curve(words, n):
     return 0.4 * _normalise(rate) + 0.6 * _normalise(hype)
 
 
-def excitement_curve(video_path, duration, words=None):
-    """0..1 excitement per 0.5 s step, from whichever signals are available."""
+def excitement_curve(video_path, duration, words=None, signal_weights=None):
+    """0..1 excitement per 0.5 s step, from whichever signals are available.
+    signal_weights: optional (audio, motion, speech) weights, e.g. chosen by the
+    RL bandit; defaults to the hand-tuned (0.45, 0.25, 0.30)."""
     n = max(1, int(duration / STEP))
+    w_audio, w_motion, w_speech = signal_weights or (0.45, 0.25, 0.30)
     parts, weights = [], []
     for name, fn, wt in (
-        ("audio", lambda: _audio_curve(video_path, n), 0.45),
-        ("motion", lambda: _motion_curve(video_path, n), 0.25),
-        ("speech", lambda: _speech_curve(words, n), 0.30),
+        ("audio", lambda: _audio_curve(video_path, n), w_audio),
+        ("motion", lambda: _motion_curve(video_path, n), w_motion),
+        ("speech", lambda: _speech_curve(words, n), w_speech),
     ):
         try:
             c = fn()
@@ -160,9 +163,10 @@ def _window_score(curve, s, e):
     return float(score + 0.002 * (e - s))   # tiny nudge towards fuller windows
 
 
-def best_signal_window(curve, duration):
+def best_signal_window(curve, duration, lengths=None):
     best = (-1.0, 0.0, min(duration, 35.0))
-    for length in WINDOW_LENGTHS:
+    candidates = [l for l in (lengths or ()) if l <= duration] or WINDOW_LENGTHS
+    for length in candidates:
         if length > duration:
             continue
         s = 0.0
@@ -210,10 +214,13 @@ def _snap(words, start, end, duration):
 # ----------------------------------------------------------------------------
 # Main entry point
 # ----------------------------------------------------------------------------
-def find_best_moment(video_path, duration, words=None, ai_window=None):
+def find_best_moment(video_path, duration, words=None, ai_window=None,
+                     signal_weights=None, lengths=None):
     """
     Returns {"start", "end", "method", "peak"} for the best 15-45 s segment.
     ai_window: optional (start, end) suggested by Groq from the transcript.
+    signal_weights / lengths: optional RL-bandit choices (see rl/bandit.py) for
+    how to weigh audio/motion/speech and which window lengths to consider.
     """
     fallback_len = min(duration, 35.0)
     fallback = {"start": round((duration - fallback_len) / 2, 2),
@@ -223,17 +230,20 @@ def find_best_moment(video_path, duration, words=None, ai_window=None):
     if duration <= 22:
         return {"start": 0.0, "end": round(duration, 2), "method": "whole clip", "peak": None}
 
-    curve = excitement_curve(video_path, duration, words)
+    curve = excitement_curve(video_path, duration, words, signal_weights)
     if curve is None:
         return fallback
     peak = round(float(np.argmax(curve)) * STEP, 1)
-    sig_score, s, e = best_signal_window(curve, duration)
+    sig_score, s, e = best_signal_window(curve, duration, lengths)
     method = "signals"
 
     if ai_window:
         a_s, a_e = ai_window
         a_s, a_e = max(0.0, float(a_s)), min(duration, float(a_e))
-        if MIN_LEN - 3 <= a_e - a_s <= MAX_LEN + 3:
+        lo, hi = MIN_LEN - 3, MAX_LEN + 3
+        if lengths:   # respect the bandit's clip-length choice (with some slack)
+            lo, hi = max(lo, min(lengths) - 5), min(hi, max(lengths) + 5)
+        if lo <= a_e - a_s <= hi:
             a_e = min(a_e, a_s + MAX_LEN)
             ai_score = _window_score(curve, a_s, max(a_e, a_s + MIN_LEN))
             # Trust the AI's story sense unless the signals say the window is dull.

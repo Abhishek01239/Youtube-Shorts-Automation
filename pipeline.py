@@ -23,6 +23,12 @@ from youtube_uploader import upload_short, upload_video, get_upload_count_today
 from facebook_uploader import upload_fb_video
 from notifier import notify_report
 
+# RL editing bandit (fails open: the pipeline runs normally without it)
+try:
+    from rl import bandit as rl_bandit
+except Exception as e:
+    rl_bandit = None
+
 # Import the news pipeline for RSS processing (direct file load for GH-Actions context)
 run_news_pipeline = None
 try:
@@ -203,6 +209,9 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
     
     uploaded_count = 0
     ai_rejections = 0  # AI picker: lowers the bar as rejections pile up
+    rl_on = bool(rl_bandit) and rl_bandit.is_enabled(channel)
+    if rl_on:
+        logging.info(f"[RL] Editing bandit active for '{channel_name}'.")
     uploads_info = []
     upload_error = None
     abort_pipeline = False
@@ -295,10 +304,24 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 cleanup_disk()
                 continue
 
+        # 3c-bis. RL bandit picks this Short's editing style (layout, punch-ins,
+        # fonts, clip length, moment style). `eff` = channel settings + choices.
+        rl_choices = {}
+        if rl_on:
+            try:
+                rl_choices = rl_bandit.choose(channel_name, channel)
+            except Exception as e:
+                logging.warning(f"[RL] choose failed ({e}); using channel defaults.")
+        eff = {**channel, **rl_bandit.to_channel_overrides(rl_choices)} if rl_choices else channel
+
         # 3d. Moment finder: best 15-45 s segment from loudness, motion and speech,
         # cross-checked with Groq's pick, cut on sentence boundaries.
         if channel.get("smart_moments", True) and clip_len > 0:
-            moment = find_best_moment(video_path, clip_len, raw_words, analysis.get("window"))
+            moment = find_best_moment(
+                video_path, clip_len, raw_words, analysis.get("window"),
+                signal_weights=rl_bandit.moment_weights(rl_choices) if rl_choices else None,
+                lengths=rl_bandit.window_lengths(rl_choices) if rl_choices else None,
+            )
             scene = {"start": moment["start"], "end": moment["end"]}
             logging.info(
                 f"[moment] {moment['start']:.1f}-{moment['end']:.1f}s of {clip_len:.0f}s "
@@ -309,7 +332,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
 
         # 3d. Layout: "auto" uses the facecam split layout when a facecam is found,
         # otherwise the blurred full-frame look.
-        framing = channel.get("framing", "auto")
+        framing = eff.get("framing", "auto")
         facecam = None
         if framing in ("auto", "split"):
             facecam = detect_facecam(video_path, clip_start, raw_dur)
@@ -318,7 +341,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
 
         # 3e. Zoom punch-ins on the loudest hype moments.
         zoom = None
-        if channel.get("punch_ins", True):
+        if eff.get("punch_ins", True):
             peaks = find_hype_moments(video_path, clip_start, raw_dur)
             zoom = zoom_expressions(peaks)
             if peaks:
@@ -363,7 +386,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         try:
             processed_path = add_captions(
                 processed_path, captioned_path,
-                font=channel.get("caption_font") or channel.get("headline_font"),
+                font=eff.get("caption_font") or eff.get("headline_font"),
                 words=caption_words,
             )
             if not processed_path or not os.path.exists(processed_path):
@@ -399,7 +422,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 processed_path, enhanced_path,
                 headline=metadata.get("title") if channel.get("headline", True) else None,
                 framing=framing,
-                headline_font=channel.get("headline_font"),
+                headline_font=eff.get("headline_font"),
                 credit=streamer if channel.get("credit_streamer", True) else None,
             )
 
@@ -433,6 +456,12 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 )
                 uploaded_count += 1
                 logging.info(f"[+] ({uploaded_count}/{shorts_per_run}) Successfully uploaded & scheduled clip {video['video_id']} for release at {scheduled_time.strftime('%H:%M')} UTC!")
+                if rl_choices:
+                    rl_bandit.log_upload(
+                        channel_name, uploaded_video_id, scheduled_time, rl_choices,
+                        extra={"source_clip": video['video_id'],
+                               "length_s": round(raw_dur, 1), "layout": framing},
+                    )
                 uploads_info.append({
                     "video_id": uploaded_video_id,
                     "title": metadata['title'],

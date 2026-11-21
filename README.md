@@ -34,6 +34,26 @@ Every Short goes through: AI clip picker → moment finder → layout → zoom p
 | `min_source_height` | `480` | Skip clips below this resolution. |
 | `enhance_quality` | `true` | Final mastering pass (sharpening, -14 LUFS loudness, high-quality encode). |
 
+## 🧠 Self-improving editing (RL bandit)
+
+Every YouTube Short is edited with a style chosen by a **multi-armed bandit** (a simple form of reinforcement learning) that learns from how your past Shorts performed.
+
+- **What it chooses** for each Short: layout (`auto` / `blur` / `crop`), punch-ins (on / off), headline font, caption font, clip length (15-25 / 25-35 / 35-45 s) and moment style (how the moment finder weighs loudness, on-screen motion and speech).
+- **How it learns:** before each run, `python -m rl.update_rewards` scores every Short that has been public for 72 h. The score mostly comes from **retention (average % watched)**, plus subscribers gained and views compared with the channel's median. Thompson sampling then favours the options that score best while still testing the others (10% fully random picks).
+- **Memory:** `data/channels/<channel>/rl_state.json` (what it believes) and `rl_log.json` (which options each Short used). The workflow commits both back to the repo.
+- **Retention needs one-time setup:** enable the *YouTube Analytics API* in your Google Cloud project, then re-run `python gen_token.py <CHANNEL>` and paste the new JSON into the `YOUTUBE_TOKEN_JSON_<CHANNEL>` secret. Until then it learns from public views and likes (via `YOUTUBE_API_KEY`).
+- **Per-channel options** in `channels.json`:
+
+```json
+"rl": {
+  "enabled": true,
+  "fixed": ["headline_font"],
+  "explore": 0.1
+}
+```
+
+`enabled` defaults to `true` for YouTube channels. Dimensions listed in `fixed` are never changed by the bandit (the channel's own setting is used). The run log prints the current beliefs after every reward update, e.g. `clip_length short 0.58 (n=12) | medium 0.51 (n=9) | long 0.44 (n=7)`.
+
 ## 🛠️ Prerequisites
 
 - Python 3.11+
