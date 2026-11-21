@@ -15,8 +15,9 @@ from highlight_detector import get_highlights, get_full_clip_range
 from video_processor import process_video, process_compilation_video, get_video_duration, get_video_height
 from minecraft_captions import add_captions
 from quality_enhancer import enhance_video
-from smart_editing import (short_window, transcribe_for_short, score_clip,
+from smart_editing import (short_window, analyze_clip, transcribe_full, words_for_short,
                            find_hype_moments, zoom_expressions, detect_facecam)
+from moment_finder import find_best_moment
 from metadata_generator import generate_metadata, generate_video_metadata
 from youtube_uploader import upload_short, upload_video, get_upload_count_today
 from facebook_uploader import upload_fb_video
@@ -263,33 +264,48 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             continue
             
         scene = highlights[0]
-        clip_start, raw_dur = short_window(scene['start'], scene['end'])
 
-        # 3b. One Whisper pass on the raw clip: feeds the AI picker AND the captions.
-        caption_words, transcript = transcribe_for_short(video_path, clip_start, raw_dur)
+        # 3b. One Whisper pass over the WHOLE raw clip: feeds the AI picker, the
+        # moment finder and the captions.
+        raw_words = transcribe_full(video_path)
+        clip_len = get_video_duration(video_path)
 
-        # 3c. AI clip picker: skip clips Groq rates below the channel's bar.
+        # 3c. One Groq call: clip score (AI picker) + its pick of the best segment.
+        base_min = channel.get("min_clip_score", 4)
+        use_ai = bool(base_min) or channel.get("smart_moments", True)
+        analysis = analyze_clip(
+            video['title'], raw_words, clip_len, game=video.get("game_name", ""),
+            views=video.get("view_count"), niche=niche,
+        ) if use_ai else {"score": None, "reason": "", "window": None}
+
+        # AI clip picker: skip clips Groq rates below the channel's bar.
         # Fails open (no key / API error -> clip is kept). The bar drops by 1
         # after every 3 rejections in a run, so a strict scorer can never starve
-        # the channel (at most ~9 rejections per run with the default bar of 4).
-        base_min = channel.get("min_clip_score", 4)
+        # the channel (at most ~6 rejections per run with the default bar of 4).
         min_score = max(1, base_min - ai_rejections // 3) if base_min else 0
-        if min_score > 1:
-            score, reason = score_clip(
-                video['title'], transcript, game=video.get("game_name", ""),
-                views=video.get("view_count"), niche=niche,
+        if min_score > 1 and analysis["score"] is not None:
+            logging.info(f"[AI picker] {analysis['score']}/10 - {analysis['reason']}")
+            if analysis["score"] < min_score:
+                ai_rejections += 1
+                logging.info(f"[-] Below current bar ({min_score}). Skipping clip.")
+                if source_type == "twitch":
+                    mark_twitch_seen(video['video_id'])
+                else:
+                    mark_youtube_seen(video['video_id'])
+                cleanup_disk()
+                continue
+
+        # 3d. Moment finder: best 15-45 s segment from loudness, motion and speech,
+        # cross-checked with Groq's pick, cut on sentence boundaries.
+        if channel.get("smart_moments", True) and clip_len > 0:
+            moment = find_best_moment(video_path, clip_len, raw_words, analysis.get("window"))
+            scene = {"start": moment["start"], "end": moment["end"]}
+            logging.info(
+                f"[moment] {moment['start']:.1f}-{moment['end']:.1f}s of {clip_len:.0f}s "
+                f"via {moment['method']}" + (f" (peak {moment['peak']}s)" if moment.get("peak") is not None else "")
             )
-            if score is not None:
-                logging.info(f"[AI picker] {score}/10 - {reason}")
-                if score < min_score:
-                    ai_rejections += 1
-                    logging.info(f"[-] Below current bar ({min_score}). Skipping clip.")
-                    if source_type == "twitch":
-                        mark_twitch_seen(video['video_id'])
-                    else:
-                        mark_youtube_seen(video['video_id'])
-                    cleanup_disk()
-                    continue
+        clip_start, raw_dur = short_window(scene['start'], scene['end'])
+        caption_words = words_for_short(raw_words, clip_start, raw_dur)
 
         # 3d. Layout: "auto" uses the facecam split layout when a facecam is found,
         # otherwise the blurred full-frame look.

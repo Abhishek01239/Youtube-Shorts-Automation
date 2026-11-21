@@ -60,25 +60,30 @@ def transcribe_for_short(video_path, start, raw_dur, language=None):
 # ----------------------------------------------------------------------------
 # AI clip picker
 # ----------------------------------------------------------------------------
-def score_clip(title, transcript, game="", views=None, niche="gaming"):
+def analyze_clip(title, words=None, duration=None, game="", views=None, niche="gaming"):
     """
-    Asks Groq to rate a clip 1-10 for how well it would do as a Short.
-    Returns (score, reason) or (None, reason) if scoring isn't possible.
+    One Groq call that (a) rates the clip 1-10 for the AI clip picker and
+    (b) names the best self-contained 15-45 s segment from the timestamped
+    transcript, for the moment finder.
+    Returns {"score", "reason", "window"}; score/window are None if unavailable.
     """
+    result = {"score": None, "reason": "scoring failed", "window": None}
     if not config.GROQ_API_KEY:
-        return None, "GROQ_API_KEY missing"
+        result["reason"] = "GROQ_API_KEY missing"
+        return result
     try:
         from groq import Groq
         from metadata_generator import _available_chat_models, _extract_json
+        from moment_finder import timestamped_transcript
 
-        transcript = (transcript or "").strip()[:1500] or "(no speech: gameplay audio only)"
-        prompt = f"""You pick Twitch clips for a YouTube Shorts channel about "{niche}".
-Rate this clip from 1 to 10 for how well it would do as a Short.
+        transcript = timestamped_transcript(words or []) or "(no speech: gameplay audio only)"
+        length = f"{duration:.0f} seconds" if duration else "unknown length"
+        prompt = f"""You pick and trim Twitch clips for a YouTube Shorts channel about "{niche}".
 
 IMPORTANT CONTEXT:
-- You only get the streamer's SPEECH. Viewers also SEE the gameplay and the
-  streamer's face, so never mark a clip down for "no visible gameplay/action":
-  you simply can't see it.
+- You only get the streamer's SPEECH (with timestamps in seconds). Viewers also SEE
+  the gameplay and the streamer's face, so never mark a clip down for "no visible
+  gameplay/action": you simply can't see it.
 - Almost every Twitch clip is casual streamer talk, reactions and swearing. Judge
   this clip against OTHER TWITCH CLIPS, not against edited videos. A typical clip
   is a 5. Profanity alone is not a reason for a low score.
@@ -89,16 +94,25 @@ IMPORTANT CONTEXT:
 Clip title: "{title}"
 Game: {game or "unknown"}
 Twitch views: {views if views is not None else "unknown"}
-Streamer speech:
-\"\"\"{transcript}\"\"\"
+Clip length: {length}
+Streamer speech, timestamped:
+{transcript}
 
-Score 7-10: clear reaction, hype, funny line, rage, clutch, or a title that promises a payoff.
-Score 4-6: ordinary clip, nothing wrong with it.
-Score 1-3 ONLY for: an ad/sponsor read, pure dead air or menus with a dull title,
-speech that is entirely in a language other than English with nothing to follow,
-or content unsafe for a general audience (slurs, sexual content).
+TASK 1 - score 1-10:
+7-10: clear reaction, hype, funny line, rage, clutch, or a title that promises a payoff.
+4-6: ordinary clip, nothing wrong with it.
+1-3 ONLY for: an ad/sponsor read, pure dead air or menus with a dull title, speech
+entirely in a language other than English with nothing to follow, or content unsafe
+for a general audience (slurs, sexual content).
 
-Reply with JSON only: {{"score": <1-10 integer>, "reason": "<one short sentence>"}}"""
+TASK 2 - best segment: pick the 15-45 second stretch a viewer would watch to the end.
+It should open with a hook or quick setup (not a long build-up, no dead air), contain
+the payoff (the reaction, punchline, play), and end 1-3 s after the payoff. The moment
+people clipped is often near the END of a Twitch clip. Use null if you can't tell
+(e.g. no speech).
+
+Reply with JSON only:
+{{"score": <1-10>, "reason": "<one short sentence>", "start": <seconds or null>, "end": <seconds or null>}}"""
 
         client = Groq(api_key=config.GROQ_API_KEY)
         for model in _available_chat_models(client)[:3]:
@@ -108,14 +122,47 @@ Reply with JSON only: {{"score": <1-10 integer>, "reason": "<one short sentence>
                     model=model, temperature=0.2,
                 )
                 obj = _extract_json(resp.choices[0].message.content)
-                if obj and "score" in obj:
-                    score = max(1, min(10, int(round(float(obj["score"])))))
-                    return score, str(obj.get("reason", ""))[:200]
+                if not obj or "score" not in obj:
+                    continue
+                result["score"] = max(1, min(10, int(round(float(obj["score"])))))
+                result["reason"] = str(obj.get("reason", ""))[:200]
+                try:
+                    st, en = obj.get("start"), obj.get("end")
+                    if st is not None and en is not None and float(en) > float(st):
+                        result["window"] = (float(st), float(en))
+                except (TypeError, ValueError):
+                    pass
+                return result
             except Exception as e:
-                logging.info(f"[smart] Groq model {model} failed for scoring: {e}")
+                logging.info(f"[smart] Groq model {model} failed for clip analysis: {e}")
     except Exception as e:
-        logging.warning(f"[smart] Clip scoring unavailable: {e}")
-    return None, "scoring failed"
+        logging.warning(f"[smart] Clip analysis unavailable: {e}")
+    return result
+
+
+def score_clip(title, transcript, game="", views=None, niche="gaming"):
+    """Backwards-compatible wrapper: (score, reason) from a plain transcript."""
+    words = [(0.0, 0.0, w) for w in (transcript or "").split()]
+    r = analyze_clip(title, words, None, game=game, views=views, niche=niche)
+    return r["score"], r["reason"]
+
+
+def transcribe_full(video_path, language=None):
+    """All words of the raw clip as (start, end, text), or None on failure."""
+    try:
+        from minecraft_captions import transcribe
+        return transcribe(video_path, language)
+    except Exception as e:
+        logging.warning(f"[smart] Transcription failed, captions will retry on their own: {e}")
+        return None
+
+
+def words_for_short(raw_words, start, raw_dur):
+    """Re-time raw-clip words onto the processed Short's (sped-up) timeline."""
+    if raw_words is None:
+        return None
+    return [((ws - start) / SPEED, (min(we, start + raw_dur) - start) / SPEED, t)
+            for ws, we, t in raw_words if start <= ws < start + raw_dur]
 
 
 # ----------------------------------------------------------------------------
