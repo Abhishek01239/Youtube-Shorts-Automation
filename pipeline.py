@@ -201,6 +201,7 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
     base_publish_time = now_utc + timedelta(hours=interval_hours)
     
     uploaded_count = 0
+    ai_rejections = 0  # AI picker: lowers the bar as rejections pile up
     uploads_info = []
     upload_error = None
     abort_pipeline = False
@@ -268,9 +269,12 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
         caption_words, transcript = transcribe_for_short(video_path, clip_start, raw_dur)
 
         # 3c. AI clip picker: skip clips Groq rates below the channel's bar.
-        # Fails open (no key / API error -> clip is kept).
-        min_score = channel.get("min_clip_score", 5)
-        if min_score:
+        # Fails open (no key / API error -> clip is kept). The bar drops by 1
+        # after every 3 rejections in a run, so a strict scorer can never starve
+        # the channel (at most ~9 rejections per run with the default bar of 4).
+        base_min = channel.get("min_clip_score", 4)
+        min_score = max(1, base_min - ai_rejections // 3) if base_min else 0
+        if min_score > 1:
             score, reason = score_clip(
                 video['title'], transcript, game=video.get("game_name", ""),
                 views=video.get("view_count"), niche=niche,
@@ -278,7 +282,8 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
             if score is not None:
                 logging.info(f"[AI picker] {score}/10 - {reason}")
                 if score < min_score:
-                    logging.info(f"[-] Below min_clip_score ({min_score}). Skipping clip.")
+                    ai_rejections += 1
+                    logging.info(f"[-] Below current bar ({min_score}). Skipping clip.")
                     if source_type == "twitch":
                         mark_twitch_seen(video['video_id'])
                     else:
