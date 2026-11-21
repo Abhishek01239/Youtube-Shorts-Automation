@@ -21,8 +21,34 @@ import config
 
 # Bundled (OpenCV 5 no longer ships this file in cv2.data). MIT-style Intel licence
 # is in the file header.
-_FACE_MODEL = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           "assets", "models", "haarcascade_frontalface_default.xml")
+_MODELS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "models")
+_FACE_MODEL = os.path.join(_MODELS, "haarcascade_frontalface_default.xml")
+# YuNet: works on OpenCV 4.5.4+ and 5.x (5.1 headless has no CascadeClassifier).
+_YUNET_MODEL = os.path.join(_MODELS, "face_detection_yunet_2023mar.onnx")
+
+
+def _face_detector(cv2, W, H):
+    """Returns detect(frame_bgr) -> list of (x, y, w, h), or None if no detector works."""
+    if hasattr(cv2, "FaceDetectorYN") and os.path.exists(_YUNET_MODEL):
+        try:
+            yn = cv2.FaceDetectorYN.create(_YUNET_MODEL, "", (W, H), 0.75, 0.3, 50)
+            yn.setInputSize((W, H))
+
+            def detect_yn(frame):
+                _, faces = yn.detect(frame)
+                return [] if faces is None else [tuple(int(v) for v in f[:4]) for f in faces]
+            return detect_yn
+        except Exception as e:
+            logging.info(f"[smart] YuNet unavailable ({e}); trying Haar cascade.")
+    if hasattr(cv2, "CascadeClassifier"):
+        cascade = cv2.CascadeClassifier(_FACE_MODEL)
+        if not cascade.empty():
+            def detect_haar(frame):
+                gray = cv2.equalizeHist(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
+                return list(cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=6,
+                                                     minSize=(int(W * 0.03), int(W * 0.03))))
+            return detect_haar
+    return None
 
 # Must match the speed-up applied in video_processor.process_video().
 SPEED = 1.2
@@ -257,10 +283,6 @@ def detect_facecam(video_path, start, raw_dur, samples=10):
     except ImportError:
         return None
     try:
-        cascade = cv2.CascadeClassifier(_FACE_MODEL)
-        if cascade.empty():
-            logging.warning("[smart] Face model could not be loaded; skipping facecam detection.")
-            return None
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             return None
@@ -268,6 +290,11 @@ def detect_facecam(video_path, start, raw_dur, samples=10):
         H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         if W <= 0 or H <= 0 or W / H < 1.3:   # only for landscape sources
             cap.release()
+            return None
+        detect = _face_detector(cv2, W, H)
+        if detect is None:
+            cap.release()
+            logging.warning("[smart] No face detector available in this OpenCV build; skipping facecam.")
             return None
 
         found = []
@@ -277,11 +304,7 @@ def detect_facecam(video_path, start, raw_dur, samples=10):
             ok, frame = cap.read()
             if not ok:
                 continue
-            gray = cv2.equalizeHist(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
-            faces = cascade.detectMultiScale(
-                gray, scaleFactor=1.1, minNeighbors=6,
-                minSize=(int(W * 0.03), int(W * 0.03)), maxSize=(int(W * 0.25), int(W * 0.25)),
-            )
+            faces = [f for f in detect(frame) if W * 0.03 <= f[2] <= W * 0.25]
             for (x, y, w, h) in faces:
                 found.append((x + w / 2, y + h / 2, w))
         cap.release()
