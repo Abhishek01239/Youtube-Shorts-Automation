@@ -577,7 +577,8 @@ def run_channel_pipeline(channel, default_count=6, default_gap=2):
                 # HARD GUARANTEE: every long-form video must be within the
                 # [min_video_seconds, max_video_seconds] window (20-40 min).
                 actual_dur = get_video_duration(processed_path)
-                if actual_dur < min_video_seconds or actual_dur > max_video_seconds:
+                # 2 s tolerance: container/keyframe rounding (2400.1 s used to fail).
+                if actual_dur < min_video_seconds - 2 or actual_dur > max_video_seconds + 2:
                     logging.error(
                         f"[!] Long-form video out of range ({actual_dur:.1f}s not in "
                         f"[{min_video_seconds}s, {max_video_seconds}s]). Discarding and retrying "

@@ -242,6 +242,16 @@ def process_compilation_video(clip_segments, output_filename, max_duration=2400,
                 .filter("colorbalance", rs=0.18, gs=0.18, bs=0.18)
                 .filter("curves", m="0/0 0.25/0.20 0.5/0.55 0.75/0.83 1/1")
                 .filter("unsharp", 5, 5, 1.2, 5, 5, 0.0)
+                # Same frame rate / pixel shape for every part: concat stream-copy
+                # with mixed 30/60 fps parts produced wildly wrong total lengths.
+                .filter("fps", 30)
+                .filter("setsar", 1)
+            )
+            # Identical stream layout + timescale in every part so they join cleanly.
+            common = dict(
+                vcodec="libx264", preset="fast", crf=18, r=30,
+                pix_fmt="yuv420p", movflags="+faststart", video_track_timescale=90000,
+                loglevel="error", threads=0,
             )
 
             # Try with original audio (normalized params so concat can stream-copy)
@@ -257,22 +267,22 @@ def process_compilation_video(clip_segments, output_filename, max_duration=2400,
 
             if has_audio:
                 try:
+                    a = a.filter("aresample", **{"async": 1, "first_pts": 0})
                     part = ffmpeg.output(
-                        v, a, part_path,
-                        vcodec="libx264", acodec="aac", preset="fast", crf=18,
-                        pix_fmt="yuv420p", movflags="+faststart",
-                        strict="experimental", loglevel="error", threads=0
+                        v, a, part_path, acodec="aac", audio_bitrate="192k",
+                        ar=44100, ac=2, t=dur, **common
                     )
                     part.run(overwrite_output=True, cmd=ffmpeg_cmd)
                 except ffmpeg.Error:
                     has_audio = False
 
             if not has_audio:
+                # A part with NO audio track breaks the joined audio for every
+                # part after it, so give it a silent track of the same length.
+                silence = ffmpeg.input("anullsrc=r=44100:cl=stereo", f="lavfi", t=dur).audio
                 part = ffmpeg.output(
-                    v, part_path,
-                    vcodec="libx264", preset="fast", crf=18,
-                    pix_fmt="yuv420p", movflags="+faststart",
-                    loglevel="error", threads=0
+                    v, silence, part_path, acodec="aac", audio_bitrate="192k",
+                    ar=44100, ac=2, t=dur, shortest=None, **common
                 )
                 part.run(overwrite_output=True, cmd=ffmpeg_cmd)
 
@@ -312,17 +322,18 @@ def process_compilation_video(clip_segments, output_filename, max_duration=2400,
                 mixed = ffmpeg.filter([merged.audio, bgm], "amix", inputs=2, duration="first")
                 ffmpeg.output(
                     merged.video, mixed, out_path,
-                    vcodec="copy", acodec="aac", preset="fast", t=max_duration,
+                    vcodec="copy", acodec="aac", preset="fast", t=max_duration - 1,
                     movflags="+faststart", loglevel="error", threads=0
                 ).run(overwrite_output=True, cmd=ffmpeg_cmd)
             else:
                 os.replace(merged_path, out_path)
         else:
             # No BGM: trim to max_duration and copy the original audio verbatim.
+            # Stream-copy trims overshoot by up to a frame/packet, so aim 1 s short.
             merged = ffmpeg.input(merged_path)
             ffmpeg.output(
                 merged.video, merged.audio, out_path,
-                vcodec="copy", acodec="copy", t=max_duration,
+                vcodec="copy", acodec="copy", t=max_duration - 1,
                 movflags="+faststart", loglevel="error", threads=0
             ).run(overwrite_output=True, cmd=ffmpeg_cmd)
 
