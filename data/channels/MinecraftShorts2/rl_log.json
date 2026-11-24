@@ -318,5 +318,165 @@
     "source_clip": "HyperCarefulRadishNerfBlueBlaster-1DxxB5NcsHUarc9c",
     "length_s": 30.5,
     "layout": "crop"
+  },
+  {
+    "video_id": "wvsU_u06vhU",
+    "publish_time": "2026-11-24T12:14:02.902947+00:00",
+    "choices": {
+      "framing": "crop",
+      "punch_ins": "off",
+      "headline_font": "bebas",
+      "caption_font": "bebas",
+      "clip_length": "long",
+      "moment_style": "balanced"
+    },
+    "rewarded": false,
+    "source_clip": "DeadRoughAlmondBCWarrior-LDU9xYZftV2CxO7m",
+    "length_s": 24.9,
+    "layout": "crop"
+  },
+  {
+    "video_id": "TysTCHQO5os",
+    "publish_time": "2026-11-24T14:14:02.902947+00:00",
+    "choices": {
+      "framing": "blur",
+      "punch_ins": "on",
+      "headline_font": "bebas",
+      "caption_font": "bangers",
+      "clip_length": "long",
+      "moment_style": "audio"
+    },
+    "rewarded": false,
+    "source_clip": "HandsomeTawdryLarkPrimeMe-SNupViLpbVRhKdkL",
+    "length_s": 20.0,
+    "layout": "blur"
+  },
+  {
+    "video_id": "l52LELobnNU",
+    "publish_time": "2026-11-24T16:14:02.902947+00:00",
+    "choices": {
+      "framing": "blur",
+      "punch_ins": "on",
+      "headline_font": "bebas",
+      "caption_font": "luckiest",
+      "clip_length": "long",
+      "moment_style": "balanced"
+    },
+    "rewarded": false,
+    "source_clip": "EsteemedCuriousTarsierTinyFace-nUANiu5nWEXssK7R",
+    "length_s": 35.5,
+    "layout": "blur"
+  },
+  {
+    "video_id": "CUNMdso_6oY",
+    "publish_time": "2026-11-24T18:14:02.902947+00:00",
+    "choices": {
+      "framing": "auto",
+      "punch_ins": "off",
+      "headline_font": "luckiest",
+      "caption_font": "anton",
+      "clip_length": "medium",
+      "moment_style": "balanced"
+    },
+    "rewarded": false,
+    "source_clip": "SmilingElatedAuberginePastaThat-XpsXIxEY05RTj6MF",
+    "length_s": 28.1,
+    "layout": "blur"
+  },
+  {
+    "video_id": "qh9c1PKVWZQ",
+    "publish_time": "2026-11-24T20:14:02.902947+00:00",
+    "choices": {
+      "framing": "auto",
+      "punch_ins": "off",
+      "headline_font": "luckiest",
+      "caption_font": "bangers",
+      "clip_length": "medium",
+      "moment_style": "action"
+    },
+    "rewarded": false,
+    "source_clip": "MotionlessBoldRamenKippa-Rdrdlradl-dFySob",
+    "length_s": 15.8,
+    "layout": "blur"
+  },
+  {
+    "video_id": "OEhmMRqvYco",
+    "publish_time": "2026-11-24T22:14:02.902947+00:00",
+    "choices": {
+      "framing": "blur",
+      "punch_ins": "off",
+      "headline_font": "bangers",
+      "caption_font": "anton",
+      "clip_length": "medium",
+      "moment_style": "balanced"
+    },
+    "rewarded": false,
+    "source_clip": "EasyArtsyPoultryRuleFive-gHGkaqIAignsK9rG",
+    "length_s": 25.6,
+    "layout": "blur"
+  },
+  {
+    "video_id": "l3pjU3pDd48",
+    "publish_time": "2026-11-25T00:14:02.902947+00:00",
+    "choices": {
+      "framing": "crop",
+      "punch_ins": "off",
+      "headline_font": "anton",
+      "caption_font": "anton",
+      "clip_length": "medium",
+      "moment_style": "balanced"
+    },
+    "rewarded": false,
+    "source_clip": "ProudArtsyGoatDendiFace-lzUGZX65hKq5bXoR",
+    "length_s": 15.0,
+    "layout": "crop"
+  },
+  {
+    "video_id": "v2zWVOFeCKU",
+    "publish_time": "2026-11-25T02:14:02.902947+00:00",
+    "choices": {
+      "framing": "auto",
+      "punch_ins": "on",
+      "headline_font": "bebas",
+      "caption_font": "bebas",
+      "clip_length": "short",
+      "moment_style": "speech"
+    },
+    "rewarded": false,
+    "source_clip": "BumblingDrabSkunkArsonNoSexy-3REOztGXV76UNmQA",
+    "length_s": 20.6,
+    "layout": "blur"
+  },
+  {
+    "video_id": "4Py6Zz325Zc",
+    "publish_time": "2026-11-25T04:14:02.902947+00:00",
+    "choices": {
+      "framing": "crop",
+      "punch_ins": "on",
+      "headline_font": "anton",
+      "caption_font": "luckiest",
+      "clip_length": "long",
+      "moment_style": "speech"
+    },
+    "rewarded": false,
+    "source_clip": "FitHealthyPorpoiseTooSpicy-36YJHZxiWcANDpvz",
+    "length_s": 20.6,
+    "layout": "crop"
+  },
+  {
+    "video_id": "S0FrxR99CVA",
+    "publish_time": "2026-11-25T06:14:02.902947+00:00",
+    "choices": {
+      "framing": "crop",
+      "punch_ins": "on",
+      "headline_font": "bangers",
+      "caption_font": "luckiest",
+      "clip_length": "long",
+      "moment_style": "action"
+    },
+    "rewarded": false,
+    "source_clip": "PuzzledAgreeableBeefRickroll-DcY2FowoZd4Wy0yf",
+    "length_s": 20.2,
+    "layout": "crop"
   }
 ]
