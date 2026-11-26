@@ -10,10 +10,17 @@
       "clip_length": "short",
       "moment_style": "audio"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "ProtectiveHeartlessGnatBigBrother-fI4JoR4Sm7UEkXl_",
     "length_s": 15.6,
-    "layout": "blur"
+    "layout": "blur",
+    "reward": 0.3309,
+    "metrics": {
+      "views": 13,
+      "likes": 0,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "Bapifsj0lIw",
@@ -26,10 +33,17 @@
       "clip_length": "short",
       "moment_style": "balanced"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "ResourcefulEphemeralSlothTheTarFu-tLvxgPl2V7lLgVwN",
     "length_s": 18.2,
-    "layout": "crop"
+    "layout": "crop",
+    "reward": 0.12,
+    "metrics": {
+      "views": 3,
+      "likes": 0,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "OipD4gCOP-A",
@@ -42,10 +56,17 @@
       "clip_length": "long",
       "moment_style": "speech"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "LachrymoseHungryKaleLitty-nBIqbeh_I6EQ_P29",
     "length_s": 15.0,
-    "layout": "blur"
+    "layout": "blur",
+    "reward": 0.6198,
+    "metrics": {
+      "views": 112,
+      "likes": 0,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "zB1ax9xDgRo",
@@ -58,10 +79,17 @@
       "clip_length": "long",
       "moment_style": "speech"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "PuzzledCulturedMacaroniKappa-wNkTQbQIZOI0lomq",
     "length_s": 21.6,
-    "layout": "crop"
+    "layout": "crop",
+    "reward": 0.0,
+    "metrics": {
+      "views": 0,
+      "likes": 0,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "k-mKNs3AUEU",
@@ -74,10 +102,17 @@
       "clip_length": "short",
       "moment_style": "action"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "OnerousGracefulDurianSpicyBoy-0UPTZPhG6DiYdrIT",
     "length_s": 18.4,
-    "layout": "blur"
+    "layout": "blur",
+    "reward": 0.556,
+    "metrics": {
+      "views": 56,
+      "likes": 0,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "rlXlXa63MGg",
@@ -90,10 +125,17 @@
       "clip_length": "medium",
       "moment_style": "action"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "KitschyGentleCookieKappa-kklxjL8dN9XXsLkV",
     "length_s": 25.7,
-    "layout": "blur"
+    "layout": "blur",
+    "reward": 0.6684,
+    "metrics": {
+      "views": 131,
+      "likes": 1,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "QPAS3p9yTJA",
@@ -106,10 +148,17 @@
       "clip_length": "long",
       "moment_style": "speech"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "CorrectNimbleDonkeyHotPokket-usPCFdLmGaUkxV8x",
     "length_s": 15.0,
-    "layout": "crop"
+    "layout": "crop",
+    "reward": 0.545,
+    "metrics": {
+      "views": 51,
+      "likes": 0,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "LqvLtTSeq08",
@@ -122,10 +171,17 @@
       "clip_length": "long",
       "moment_style": "speech"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "YummyImpossibleCoffeeBCWarrior-MG5yvZIkVfyiwMHo",
     "length_s": 24.5,
-    "layout": "crop"
+    "layout": "crop",
+    "reward": 0.0,
+    "metrics": {
+      "views": 0,
+      "likes": 0,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "Amm1X3jZtV4",
@@ -138,10 +194,17 @@
       "clip_length": "medium",
       "moment_style": "action"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "DifferentTrustworthySalsifyDoubleRainbow-MS_ntdbejA4-KLiO",
     "length_s": 26.5,
-    "layout": "blur"
+    "layout": "blur",
+    "reward": 0.3672,
+    "metrics": {
+      "views": 16,
+      "likes": 0,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "UTiLsW1mphI",
@@ -154,10 +217,17 @@
       "clip_length": "short",
       "moment_style": "audio"
     },
-    "rewarded": false,
+    "rewarded": true,
     "source_clip": "DignifiedKitschyRingNerfRedBlaster-aoLBn7nZQEyZTbQ9",
     "length_s": 16.5,
-    "layout": "blur"
+    "layout": "blur",
+    "reward": 0.0,
+    "metrics": {
+      "views": 0,
+      "likes": 0,
+      "source": "public"
+    },
+    "scored_at": "2026-11-26T08:45:29.694558+00:00"
   },
   {
     "video_id": "Lp8ZNEaJ69Y",
@@ -637,6 +707,166 @@
     "rewarded": false,
     "source_clip": "ObedientFreezingTroutAMPTropPunch-Ww5IP7KMdgfgHDLz",
     "length_s": 21.8,
+    "layout": "blur"
+  },
+  {
+    "video_id": "3KOkOzijPs8",
+    "publish_time": "2026-11-26T10:45:31.259572+00:00",
+    "choices": {
+      "framing": "auto",
+      "punch_ins": "off",
+      "headline_font": "luckiest",
+      "caption_font": "bebas",
+      "clip_length": "medium",
+      "moment_style": "balanced"
+    },
+    "rewarded": false,
+    "source_clip": "GracefulEnchantingOkapiNomNom-Wl1RH3U_GIsJTilI",
+    "length_s": 25.0,
+    "layout": "blur"
+  },
+  {
+    "video_id": "f-X49VLvCYM",
+    "publish_time": "2026-11-26T12:45:31.259572+00:00",
+    "choices": {
+      "framing": "blur",
+      "punch_ins": "off",
+      "headline_font": "bangers",
+      "caption_font": "bebas",
+      "clip_length": "long",
+      "moment_style": "speech"
+    },
+    "rewarded": false,
+    "source_clip": "ResourcefulEphemeralLocustSmoocherZ-bcFRt4RUPTZWxDid",
+    "length_s": 36.4,
+    "layout": "blur"
+  },
+  {
+    "video_id": "4_ksXqNlfJ8",
+    "publish_time": "2026-11-26T14:45:31.259572+00:00",
+    "choices": {
+      "framing": "auto",
+      "punch_ins": "off",
+      "headline_font": "anton",
+      "caption_font": "bangers",
+      "clip_length": "medium",
+      "moment_style": "speech"
+    },
+    "rewarded": false,
+    "source_clip": "ArborealProtectiveBarracudaJonCarnage-BDMg7rQvJ0uuWXeN",
+    "length_s": 27.5,
+    "layout": "blur"
+  },
+  {
+    "video_id": "6AWScBSWA1Y",
+    "publish_time": "2026-11-26T16:45:31.259572+00:00",
+    "choices": {
+      "framing": "blur",
+      "punch_ins": "off",
+      "headline_font": "luckiest",
+      "caption_font": "luckiest",
+      "clip_length": "medium",
+      "moment_style": "speech"
+    },
+    "rewarded": false,
+    "source_clip": "MoldyBoldMelonTheThing-B7TE3qmsGQhD0sCr",
+    "length_s": 33.6,
+    "layout": "blur"
+  },
+  {
+    "video_id": "Vp9JYT-2z7Y",
+    "publish_time": "2026-11-26T18:45:31.259572+00:00",
+    "choices": {
+      "framing": "auto",
+      "punch_ins": "off",
+      "headline_font": "bebas",
+      "caption_font": "anton",
+      "clip_length": "short",
+      "moment_style": "speech"
+    },
+    "rewarded": false,
+    "source_clip": "ImpossibleBoringQuailUnSane-zEJL_raabRHKWLyO",
+    "length_s": 17.5,
+    "layout": "blur"
+  },
+  {
+    "video_id": "aXTFTF7HCnc",
+    "publish_time": "2026-11-26T20:45:31.259572+00:00",
+    "choices": {
+      "framing": "auto",
+      "punch_ins": "off",
+      "headline_font": "luckiest",
+      "caption_font": "luckiest",
+      "clip_length": "medium",
+      "moment_style": "action"
+    },
+    "rewarded": false,
+    "source_clip": "BrightSnappyLlamaBudStar-8VB5rnUWOhmEP0GI",
+    "length_s": 27.4,
+    "layout": "blur"
+  },
+  {
+    "video_id": "1ScAs66Ig2E",
+    "publish_time": "2026-11-26T22:45:31.259572+00:00",
+    "choices": {
+      "framing": "blur",
+      "punch_ins": "off",
+      "headline_font": "bebas",
+      "caption_font": "bebas",
+      "clip_length": "medium",
+      "moment_style": "speech"
+    },
+    "rewarded": false,
+    "source_clip": "ProtectiveTriumphantPepperNotATK-S34Bt2doIOoeK6N1",
+    "length_s": 27.1,
+    "layout": "blur"
+  },
+  {
+    "video_id": "NeFkTNQN5Jw",
+    "publish_time": "2026-11-27T00:45:31.259572+00:00",
+    "choices": {
+      "framing": "auto",
+      "punch_ins": "off",
+      "headline_font": "bebas",
+      "caption_font": "anton",
+      "clip_length": "short",
+      "moment_style": "audio"
+    },
+    "rewarded": false,
+    "source_clip": "TubularEasyCaribouKappaRoss-SQMxaN8TBNAjIsM-",
+    "length_s": 15.6,
+    "layout": "blur"
+  },
+  {
+    "video_id": "XIV33PqkP98",
+    "publish_time": "2026-11-27T02:45:31.259572+00:00",
+    "choices": {
+      "framing": "crop",
+      "punch_ins": "off",
+      "headline_font": "bangers",
+      "caption_font": "bebas",
+      "clip_length": "medium",
+      "moment_style": "action"
+    },
+    "rewarded": false,
+    "source_clip": "AntediluvianTrappedPastaChocolateRain-xHNTfHLl_k7dl0-L",
+    "length_s": 25.2,
+    "layout": "crop"
+  },
+  {
+    "video_id": "zkHl2APm4VU",
+    "publish_time": "2026-11-27T04:45:31.259572+00:00",
+    "choices": {
+      "framing": "blur",
+      "punch_ins": "off",
+      "headline_font": "bebas",
+      "caption_font": "anton",
+      "clip_length": "medium",
+      "moment_style": "audio"
+    },
+    "rewarded": false,
+    "source_clip": "SmoggyTsundereDonutFrankerZ-QOMln6x3L7EwePgw",
+    "length_s": 20.9,
     "layout": "blur"
   }
 ]
